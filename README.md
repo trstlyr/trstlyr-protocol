@@ -236,7 +236,7 @@ TrstLyr is free infrastructure for the agent internet — the same way DNS, SSL,
 - 🐙 [GitHub Sponsors](https://github.com/sponsors/tankcdr) — sustain ongoing development
 - 🔁 [Gitcoin](https://gitcoin.co) — support in public goods funding rounds
 - 🏛️ We're actively seeking grants from Ethereum Foundation, Base, Optimism RetroPGF, and similar programs
-- 📬 For foundation partnerships or integration inquiries: [chris@trstlyr.ai](mailto:chris@trstlyr.ai)
+- 📬 For foundation partnerships or integration inquiries: [cmadison@trstlyr.ai](mailto:cmadison@trstlyr.ai)
 
 If you're building an agent framework, a skill marketplace, or any system where agents interact with agents — TrstLyr is designed to be your trust layer. [Open an issue](https://github.com/tankcdr/aegis/issues) or reach out directly.
 
