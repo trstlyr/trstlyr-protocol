@@ -223,6 +223,13 @@ const tokenId = await registry.register('data:application/json;base64,...');
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE).
+**Open Core** — two tiers:
+
+| Component | License |
+|-----------|---------|
+| `packages/core`, `packages/mcp`, `apps/api`, `apps/web` | [Apache 2.0](LICENSE) — free forever, self-hostable |
+| `packages/core-ee`, `apps/api-ee` | [BSL 1.1](LICENSE-EE) — converts to Apache 2.0 after 4 years |
+
+Enterprise licensing: chris@trstlyr.ai — see [LICENSE](LICENSE).
 
 Built by [Chris Madison](https://github.com/tankcdr) · Powered by Charon ⛵

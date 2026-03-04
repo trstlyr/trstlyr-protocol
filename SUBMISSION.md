@@ -90,7 +90,7 @@ TrstLyr Protocol is live infrastructure. Not a demo. Not a prototype.
 - **EAS attestations** anchored on Base Mainnet ($0.01 USDC via x402 after free tier)
 - **MCP server** installable in Claude Desktop with one line
 - **A2A agent card** at `/.well-known/agent.json` — Charon is discoverable via the A2A protocol
-- **Open source** — Apache 2.0, public from day one
+- **Open core** — Core engine Apache 2.0 (self-hostable, free forever); enterprise features (EigenTrust, capability scores, tenant isolation) under BSL-1.1
 
 The question we set out to answer: *before your agent talks to another agent, should it trust that agent?*
 
