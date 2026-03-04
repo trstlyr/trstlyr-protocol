@@ -235,6 +235,7 @@ TrstLyr is free infrastructure for the agent internet — the same way DNS, SSL,
 - ⭐ Star this repo — visibility helps
 - 🐙 [GitHub Sponsors](https://github.com/sponsors/tankcdr) — sustain ongoing development
 - 🔁 [Gitcoin](https://gitcoin.co) — support in public goods funding rounds
+- 💰 ETH/USDC donations: `0x8D9623A4a9198c0bCdf4c042e95aB1c0955180bD` (Ethereum + Base)
 - 🏛️ We're actively seeking grants from Ethereum Foundation, Base, Optimism RetroPGF, and similar programs
 - 📬 For foundation partnerships or integration inquiries: [cmadison@trstlyr.ai](mailto:cmadison@trstlyr.ai)
 
