@@ -20,7 +20,8 @@ const sig = (score: number, confidence: number): Signal => ({
   score,
   confidence,
   ttl: 300,
-  raw: {},
+  evidence: {},
+  timestamp: new Date().toISOString(),
 });
 
 // ── signalToOpinion ───────────────────────────────────────────────────────────
