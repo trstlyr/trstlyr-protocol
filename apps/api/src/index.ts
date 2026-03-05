@@ -494,6 +494,87 @@ server.post('/v1/identity/verify', async (request, reply) => {
 const BASE_URL = process.env['BASE_URL'] ?? 'https://api.trstlyr.ai';
 await registerAttestRoutes(server, engine, BASE_URL);
 
+// POST /v1/trust/gate — pre-trade / pre-action trust check
+// Returns machine-readable proceed: true/false with score + risk context.
+// Threshold logic:
+//   Default threshold: 65 (override via TRUST_GATE_DEFAULT_THRESHOLD env)
+//   Action escalation:
+//     transact  → threshold 65, ≥$1K → 70, ≥$10K → 75
+//     delegate  → threshold 70
+//     execute   → threshold 60
+//     install   → threshold 55
+//     review    → threshold 40
+//   Risk shortcut: risk_level high/critical → reject regardless of score
+server.post('/v1/trust/gate', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (request, reply) => {
+  const body = request.body as {
+    counterparty?: string;
+    action?: string;
+    amount_usd?: number;
+  } | undefined;
+
+  if (!body?.counterparty || typeof body.counterparty !== 'string') {
+    return reply.code(400).send({
+      error: '"counterparty" is required (e.g. "erc8004:42" or "github:tankcdr")',
+    });
+  }
+  if (!validateSubjectString(body.counterparty, reply)) return;
+
+  const action = (body.action ?? 'transact') as Action;
+  const amountUsd = typeof body.amount_usd === 'number' ? body.amount_usd : null;
+
+  // Determine threshold based on action + amount
+  const DEFAULT_THRESHOLD = parseInt(process.env['TRUST_GATE_DEFAULT_THRESHOLD'] ?? '65', 10);
+  const ACTION_THRESHOLDS: Record<string, number> = {
+    transact: DEFAULT_THRESHOLD,
+    delegate: 70,
+    execute:  60,
+    install:  55,
+    review:   40,
+  };
+  let threshold = ACTION_THRESHOLDS[action] ?? DEFAULT_THRESHOLD;
+  let contextEscalation: string | null = null;
+
+  if (action === 'transact' && amountUsd !== null && amountUsd >= 10_000) {
+    threshold = 75;
+    contextEscalation = 'transact high-value (>=\$10K) -> threshold elevated to 75';
+  } else if (action === 'transact' && amountUsd !== null && amountUsd >= 1_000) {
+    threshold = 70;
+    contextEscalation = 'transact mid-value (>=\$1K) -> threshold elevated to 70';
+  }
+
+  // Parse counterparty subject
+  const colonIdx = body.counterparty.indexOf(':');
+  const namespace = colonIdx > 0 ? body.counterparty.slice(0, colonIdx) : 'github';
+  const id = colonIdx > 0 ? body.counterparty.slice(colonIdx + 1) : body.counterparty;
+
+  const startMs = Date.now();
+  const result = await engine.query({
+    subject: { type: 'agent', namespace, id },
+    context: { action },
+  });
+  const latencyMs = Date.now() - startMs;
+
+  // Risk shortcut: always block on high/critical regardless of numeric score
+  const highRisk = result.risk_level === 'high' || result.risk_level === 'critical';
+  const proceed = !highRisk && result.trust_score >= threshold;
+
+  return reply.send({
+    proceed,
+    counterparty: `${namespace}:${id}`,
+    trust_score: result.trust_score,
+    confidence: result.confidence,
+    risk_level: result.risk_level,
+    recommendation_label: result.recommendation,
+    threshold_used: threshold,
+    action,
+    ...(contextEscalation ? { context_escalation: contextEscalation } : {}),
+    ...(highRisk ? { block_reason: `risk_level "${result.risk_level}" is always blocked` } : {}),
+    signals_used: result.signals.length,
+    latency_ms: latencyMs,
+    evaluated_at: result.evaluated_at,
+  });
+});
+
 // POST /v1/audit/submit — SPEC §5.5 (Phase 2)
 server.post('/v1/audit/submit', async (_request, reply) => {
   return reply.code(501).send({ error: 'Audit submissions — Phase 2' });
@@ -523,8 +604,10 @@ server.get('/.well-known/agent.json', async (_request, reply) => {
         { id: 'trust_batch',       name: 'Batch Trust Query',     description: 'Evaluate up to 20 subjects in one call' },
         { id: 'identity_register', name: 'Identity Registration', description: 'Register and verify agent identities across namespaces' },
         { id: 'attest',            name: 'On-chain Attestation',  description: 'Anchor trust scores as EAS attestations on Base Mainnet' },
+        { id: 'trust_gate',        name: 'Trust Gate',            description: 'Pre-trade / pre-action trust check — returns proceed:true/false with score, risk, and threshold context', tags: ['trading', 'risk', 'compliance'] },
       ],
       trstlyrScoreUrl: 'https://api.trstlyr.ai/v1/trust/score/erc8004:19077',
+      trustGateEndpoint: 'https://api.trstlyr.ai/v1/trust/gate',
     });
 });
 
