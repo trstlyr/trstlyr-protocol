@@ -18,16 +18,45 @@ interface HolAgent {
   metadata?: Record<string, unknown>;
 }
 
-async function fetchHolAgents(limit = 100, offset = 0): Promise<HolAgent[]> {
+interface HolSearchHit {
+  id: string;
+  uaid?: string;
+  name?: string;
+  description?: string;
+  registry?: string;
+  capabilities?: unknown[];
+  endpoints?: Record<string, string>;
+  metadata?: Record<string, unknown>;
+}
+
+// Map HOL.org capabilities (numeric enum) to string tags
+function holCapabilitiesToStrings(caps: unknown[]): string[] {
+  // HOL.org capability enum: 0=text, 1=voice, 2=vision, 3=code, etc.
+  const capMap: Record<number, string> = { 0: 'text', 1: 'voice', 2: 'vision', 3: 'code', 4: 'data', 5: 'web' };
+  return caps
+    .filter((c): c is number => typeof c === 'number')
+    .map(c => capMap[c] ?? `cap_${c}`);
+}
+
+async function fetchHolAgents(q = 'agent', limit = 100, _offset = 0): Promise<HolAgent[]> {
   try {
-    const url = `https://hol.org/registry/api/v1/agents?limit=${limit}&offset=${offset}`;
+    // GET /registry/api/v1/search — keyword search across all registries
+    const url = `https://hol.org/registry/api/v1/search?q=${encodeURIComponent(q)}&limit=${Math.min(limit, 50)}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) {
       console.warn(`[discover] HOL.org returned ${res.status} — skipping`);
       return [];
     }
-    const data = await res.json() as { agents?: HolAgent[]; items?: HolAgent[] };
-    return data.agents ?? data.items ?? [];
+    const data = await res.json() as { hits?: HolSearchHit[]; results?: HolSearchHit[] };
+    const hits = data.hits ?? data.results ?? [];
+    return hits.map(h => ({
+      id: `hol:${h.uaid ?? h.id}`,
+      name: h.name ?? h.id,
+      description: h.description,
+      protocols: h.endpoints ? Object.keys(h.endpoints).map(k => k.toLowerCase()) : [],
+      capabilities: holCapabilitiesToStrings(Array.isArray(h.capabilities) ? h.capabilities : []),
+      metadata: { registry: h.registry, uaid: h.uaid, endpoints: h.endpoints, ...h.metadata },
+    }));
   } catch (err) {
     console.warn('[discover] HOL.org unreachable:', (err as Error).message);
     return [];
@@ -191,7 +220,7 @@ export async function registerDiscoverRoutes(
       // ── HOL.org (primary external source when agent_index is small) ───────────
       // Wire up regardless of 503 — when they come back, we get 72k agents for free
       if (indexRows.length === 0) {
-        const holAgents = await fetchHolAgents(limit, offset);
+        const holAgents = await fetchHolAgents(q ?? 'agent', limit, offset);
         if (holAgents.length > 0) {
           indexRows = holAgents.map(a => ({
             id: a.id,
