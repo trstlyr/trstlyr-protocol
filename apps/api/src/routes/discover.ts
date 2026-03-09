@@ -1,46 +1,82 @@
-// GET /v1/discover — Agent discovery with live trust scoring
-// Finds agents by capability, filtered and ranked by trust score.
-//
-// Design spec: docs/discovery-design.md
-// Research notes: docs/discovery-research-notes.md
+// GET /v1/discover — protocol-agnostic agent discovery with live trust scoring
+// x402 priced: 0.001 USDC per query, 3 free queries per IP per day
 
 import type { FastifyInstance } from 'fastify';
 import type { AegisEngine } from '@aegis-protocol/core';
 import { listAgentIndex, countAgentIndex, type AgentIndexRow } from '../db.js';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── HOL.org integration ───────────────────────────────────────────────────────
+// HOL.org aggregates 72k+ agents across 14 registries.
+// Currently returning 503 — wired up and ready for when they come back.
 
-interface AgentSummary {
+interface HolAgent {
   id: string;
   name: string;
   description?: string;
-  entity_type: 'agent' | 'skill' | 'developer';
-  trust_score: number;
-  confidence: number;
-  risk_level: string;
-  recommendation: string;
-  protocols: string[];
-  capabilities: string[];
-  claimed: boolean;
-  providers: Record<string, unknown>;
-  endpoints: {
-    trust_score: string;
-    trust_gate: string;
-    badge_svg: string;
-    a2a_card?: string;
-    mcp_server?: string;
-  };
-  linked_identifiers: string[];
-  last_updated: string;
+  protocols?: string[];
+  capabilities?: string[];
+  metadata?: Record<string, unknown>;
 }
 
-interface DiscoverQuerystring {
+async function fetchHolAgents(limit = 100, offset = 0): Promise<HolAgent[]> {
+  try {
+    const url = `https://hol.org/registry/api/v1/agents?limit=${limit}&offset=${offset}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) {
+      console.warn(`[discover] HOL.org returned ${res.status} — skipping`);
+      return [];
+    }
+    const data = await res.json() as { agents?: HolAgent[]; items?: HolAgent[] };
+    return data.agents ?? data.items ?? [];
+  } catch (err) {
+    console.warn('[discover] HOL.org unreachable:', (err as Error).message);
+    return [];
+  }
+}
+
+// ─── Known fallback agents (real agents with real data) ───────────────────────
+// Used when agent_index is empty AND HOL.org is down.
+const FALLBACK_SUBJECTS = [
+  { namespace: 'erc8004', id: '19077' },   // Charon — TrstLyr Protocol
+  { namespace: 'moltbook', id: 'nyx' },
+  { namespace: 'moltbook', id: 'erebus' },
+  { namespace: 'github', id: 'tankcdr/aegis' },
+  { namespace: 'clawhub', id: 'charon' },
+];
+
+// ─── x402 free-tier tracking (in-memory, per IP) ─────────────────────────────
+// 3 free queries per IP per day — then require X-Payment.
+// In production replace with DB-backed store (same pattern as attestation_free_tier).
+const discoverFreeTier = new Map<string, { count: number; resetAt: number }>();
+const FREE_LIMIT = 3;
+const DAY_MS = 86_400_000;
+
+function checkFreeQuota(ip: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = discoverFreeTier.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    discoverFreeTier.set(ip, { count: 1, resetAt: now + DAY_MS });
+    return { allowed: true, remaining: FREE_LIMIT - 1 };
+  }
+
+  if (entry.count < FREE_LIMIT) {
+    entry.count++;
+    return { allowed: true, remaining: FREE_LIMIT - entry.count };
+  }
+
+  return { allowed: false, remaining: 0 };
+}
+
+// ─── Query params ─────────────────────────────────────────────────────────────
+
+interface DiscoverQuery {
   q?: string;
   min_score?: string;
   max_score?: string;
-  provider?: string;
-  capability?: string;
-  protocol?: string;
+  provider?: string;    // comma-separated
+  capability?: string;  // comma-separated
+  protocol?: string;    // comma-separated
   claimed?: string;
   min_confidence?: string;
   limit?: string;
@@ -48,243 +84,247 @@ interface DiscoverQuerystring {
   sort?: string;
 }
 
-// ─── Seeded agents (fallback when agent_index is empty) ───────────────────────
-// Known agents in the ecosystem — scored live on every request.
+// ─── Response types ───────────────────────────────────────────────────────────
 
-const SEEDED_AGENTS: AgentIndexRow[] = [
-  {
-    id: 'erc8004:19077',
-    name: 'Charon',
-    description: 'TrstLyr Protocol — trust infrastructure for the agent internet. Evaluates AI agents, skills, and repos via multi-signal trust scoring.',
-    entity_type: 'agent',
-    protocols: ['erc8004', 'a2a', 'mcp'],
-    capabilities: ['trust_scoring', 'identity_verification', 'attestation', 'discovery'],
-    claimed: true,
-    provider_sources: ['erc8004', 'github', 'moltbook'],
-    last_indexed_at: new Date().toISOString(),
-    metadata: { a2a_card: 'https://api.trstlyr.ai/.well-known/agent.json' },
-  },
-  {
-    id: 'moltbook:nyx',
-    name: 'Nyx',
-    description: 'Personal assistant agent — information retrieval, research, and narrative.',
-    entity_type: 'agent',
-    protocols: ['moltbook'],
-    capabilities: ['research', 'marketing', 'writing'],
-    claimed: true,
-    provider_sources: ['moltbook'],
-    last_indexed_at: new Date().toISOString(),
-    metadata: {},
-  },
-  {
-    id: 'moltbook:erebus',
-    name: 'Erebus',
-    description: 'Trading and forecasting agent — prediction markets, Polymarket, risk analysis.',
-    entity_type: 'agent',
-    protocols: ['moltbook'],
-    capabilities: ['forecasting', 'trading', 'prediction_markets', 'risk_analysis'],
-    claimed: true,
-    provider_sources: ['moltbook'],
-    last_indexed_at: new Date().toISOString(),
-    metadata: {},
-  },
-  {
-    id: 'github:tankcdr/aegis',
-    name: 'Aegis Protocol',
-    description: 'Open-source trust layer for the agent internet. Gitcoin Passport for agents.',
-    entity_type: 'skill',
-    protocols: ['github'],
-    capabilities: ['trust_scoring', 'identity_verification', 'eas_attestation'],
-    claimed: true,
-    provider_sources: ['github'],
-    last_indexed_at: new Date().toISOString(),
-    metadata: {},
-  },
-];
+interface ProviderSnapshots {
+  moltbook?: { karma?: number; followers?: number; is_claimed?: boolean; is_active?: boolean; profile_url?: string };
+  github?: { stars?: number; repos?: number; followers?: number; commit_frequency?: string };
+  erc8004?: { registry_id?: string; owner_address?: string; services?: string[]; supported_trust?: string[] };
+  clawhub?: { skill_count?: number; total_installs?: number; total_stars?: number };
+  twitter?: { followers?: number; verified?: boolean };
+  hol?: { source_registries?: string[]; agent_url?: string };
+}
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const API_BASE = 'https://api.trstlyr.ai';
-
-function buildEndpoints(id: string, metadata: Record<string, unknown>): AgentSummary['endpoints'] {
-  const encoded = encodeURIComponent(id);
-  return {
-    trust_score: `${API_BASE}/v1/trust/score/${encoded}`,
-    trust_gate:  `${API_BASE}/v1/trust/gate`,
-    badge_svg:   `${API_BASE}/v1/trust/score/${encoded}/badge.svg`,
-    ...(metadata['a2a_card']   ? { a2a_card:   metadata['a2a_card'] as string }   : {}),
-    ...(metadata['mcp_server'] ? { mcp_server: metadata['mcp_server'] as string } : {}),
+interface AgentSummary {
+  id: string;
+  name: string;
+  description?: string;
+  entity_type: string;
+  trust_score: number;
+  confidence: number;
+  risk_level: string;
+  recommendation: string;
+  protocols: string[];
+  capabilities: string[];
+  claimed: boolean;
+  providers: ProviderSnapshots;
+  endpoints: {
+    a2a_card?: string;
+    mcp_server?: string;
+    trust_score: string;
+    trust_gate: string;
+    badge_svg: string;
   };
+  linked_identifiers: string[];
+  last_updated: string;
 }
 
-function extractProviderSnapshot(signals: Array<{ provider: string; evidence: Record<string, unknown> }>): Record<string, unknown> {
-  const snap: Record<string, unknown> = {};
-  for (const sig of signals) {
-    if (!snap[sig.provider] && Object.keys(sig.evidence).length > 0) {
-      snap[sig.provider] = sig.evidence;
-    }
-  }
-  return snap;
-}
-
-// ─── Route registration ───────────────────────────────────────────────────────
+// ─── Route registration ────────────────────────────────────────────────────────
 
 export async function registerDiscoverRoutes(
   server: FastifyInstance,
   engine: AegisEngine,
 ): Promise<void> {
 
-  server.get<{ Querystring: DiscoverQuerystring }>(
+  server.get<{ Querystring: DiscoverQuery }>(
     '/v1/discover',
     {
-      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      config: {
+        rateLimit: { max: 30, timeWindow: '1 minute' },
+      },
     },
     async (request, reply) => {
       const startMs = Date.now();
 
-      // ── Parse query params ─────────────────────────────────────────────────
-      const q             = request.query.q?.trim() ?? null;
-      const minScore      = parseFloat(request.query.min_score ?? '0');
-      const maxScore      = parseFloat(request.query.max_score ?? '100');
-      const minConf       = parseFloat(request.query.min_confidence ?? '0');
-      const limitRaw      = Math.min(parseInt(request.query.limit ?? '20', 10), 100);
-      const limit         = isNaN(limitRaw) || limitRaw < 1 ? 20 : limitRaw;
-      const offsetRaw     = parseInt(request.query.offset ?? '0', 10);
-      const offset        = isNaN(offsetRaw) || offsetRaw < 0 ? 0 : offsetRaw;
-      const sort          = request.query.sort ?? 'trust_score';
-      const providerFilter = request.query.provider
-        ? request.query.provider.split(',').map(s => s.trim()).filter(Boolean)
-        : null;
-      const capabilityFilter = request.query.capability
-        ? request.query.capability.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
-        : null;
-      const protocolFilter = request.query.protocol
-        ? request.query.protocol.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
-        : null;
-      const claimedFilter = request.query.claimed != null
-        ? request.query.claimed === 'true'
-        : null;
+      // ── x402 gate ────────────────────────────────────────────────────────────
+      // 3 free queries per IP per day; after that, require X-Payment: 0.001 USDC
+      const ip = (request.ip ?? '0.0.0.0').split(':').pop() ?? '0.0.0.0';
+      const hasPayment = Boolean(request.headers['x-payment']);
+      const { allowed, remaining } = checkFreeQuota(ip);
 
-      // Validate sort
-      const validSorts = ['trust_score', 'confidence', 'updated_at'];
-      if (!validSorts.includes(sort)) {
-        return reply.code(400).send({
-          error: `Invalid sort. Valid values: ${validSorts.join(', ')}`,
-        });
+      if (!allowed && !hasPayment) {
+        return reply
+          .code(402)
+          .header('X-Payment-Required', 'true')
+          .header('X-Free-Queries-Remaining', '0')
+          .send({
+            error: 'Payment required — free tier exhausted (3 queries/day)',
+            payment: {
+              amount_usdc: '0.001',
+              network: 'Base Mainnet',
+              asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+              payTo: process.env['X402_PAYMENT_RECEIVER'] ?? process.env['AEGIS_ATTESTATION_PRIVATE_KEY'] ?? '',
+              description: 'TrstLyr /discover — 0.001 USDC per query',
+            },
+          });
       }
 
-      // ── Load candidate agents ──────────────────────────────────────────────
-      let candidates: AgentIndexRow[];
+      // ── Parse query params ────────────────────────────────────────────────────
+      const q = request.query.q?.trim();
+      const minScore = parseFloat(request.query.min_score ?? '0');
+      const maxScore = parseFloat(request.query.max_score ?? '100');
+      const minConfidence = parseFloat(request.query.min_confidence ?? '0');
+      const providers = request.query.provider?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+      const capabilities = request.query.capability?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+      const protocols = request.query.protocol?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+      const claimedFilter = request.query.claimed === 'true' ? true : request.query.claimed === 'false' ? false : undefined;
+      const limit = Math.min(parseInt(request.query.limit ?? '20', 10), 100);
+      const offset = parseInt(request.query.offset ?? '0', 10);
+      const sort = request.query.sort ?? 'trust_score';
+
+      // ── Pull from agent_index ─────────────────────────────────────────────────
+      let indexRows: AgentIndexRow[] = [];
       let total = 0;
+      let usingFallback = false;
 
       try {
-        // Try DB first — returns [] on miss or if Supabase not configured
-        const dbFilters = {
-          provider: providerFilter ?? undefined,
-          capability: capabilityFilter ?? undefined,
-          protocol: protocolFilter ?? undefined,
-          claimed: claimedFilter ?? undefined,
-          q: q ?? undefined,
-        };
         const [rows, count] = await Promise.all([
-          listAgentIndex(dbFilters),
-          countAgentIndex(dbFilters),
+          listAgentIndex({ q, provider: providers, capability: capabilities, protocol: protocols, claimed: claimedFilter, limit: limit * 3, offset }),
+          countAgentIndex({ q, provider: providers, capability: capabilities, protocol: protocols, claimed: claimedFilter }),
         ]);
-
-        if (rows.length > 0) {
-          candidates = rows;
-          total = count;
-        } else {
-          // Fall back to seeded agents — filter locally
-          candidates = SEEDED_AGENTS.filter(a => {
-            if (claimedFilter !== null && a.claimed !== claimedFilter) return false;
-            if (protocolFilter && !protocolFilter.some(p => a.protocols.includes(p))) return false;
-            if (capabilityFilter && !capabilityFilter.some(c => a.capabilities.includes(c))) return false;
-            if (providerFilter && !providerFilter.some(p => a.provider_sources.includes(p))) return false;
-            if (q) {
-              const needle = q.toLowerCase();
-              const haystack = `${a.name} ${a.description ?? ''} ${a.capabilities.join(' ')}`.toLowerCase();
-              if (!haystack.includes(needle)) return false;
-            }
-            return true;
-          });
-          total = candidates.length;
-        }
+        indexRows = rows;
+        total = count;
       } catch {
-        // If DB completely fails, use seeded agents
-        candidates = SEEDED_AGENTS;
-        total = SEEDED_AGENTS.length;
+        // DB unavailable — fall through to fallback
       }
 
-      // ── Score candidates in parallel ───────────────────────────────────────
+      // ── HOL.org (primary external source when agent_index is small) ───────────
+      // Wire up regardless of 503 — when they come back, we get 72k agents for free
+      if (indexRows.length === 0) {
+        const holAgents = await fetchHolAgents(limit, offset);
+        if (holAgents.length > 0) {
+          indexRows = holAgents.map(a => ({
+            id: a.id,
+            name: a.name,
+            description: a.description,
+            entity_type: 'agent',
+            protocols: a.protocols ?? [],
+            capabilities: a.capabilities ?? [],
+            claimed: false,
+            provider_sources: ['hol'],
+            last_indexed_at: new Date().toISOString(),
+            metadata: a.metadata ?? {},
+          }));
+          total = holAgents.length;
+        }
+      }
+
+      // ── Fallback: known agents ─────────────────────────────────────────────────
+      if (indexRows.length === 0) {
+        usingFallback = true;
+        indexRows = FALLBACK_SUBJECTS.map(s => ({
+          id: `${s.namespace}:${s.id}`,
+          name: s.id,
+          description: undefined,
+          entity_type: 'agent',
+          protocols: [s.namespace],
+          capabilities: [],
+          claimed: false,
+          provider_sources: [s.namespace],
+          last_indexed_at: new Date().toISOString(),
+          metadata: {},
+        }));
+        total = indexRows.length;
+      }
+
+      // ── Fan out trust scoring in parallel ─────────────────────────────────────
       const scored = await Promise.allSettled(
-        candidates.map(agent =>
-          engine.query({ subject: { type: 'agent', ...parseSubject(agent.id) } })
-            .then(result => ({ agent, result }))
-        ),
+        indexRows.map(async row => {
+          const colonIdx = row.id.indexOf(':');
+          const namespace = colonIdx > 0 ? row.id.slice(0, colonIdx) : 'github';
+          const id = colonIdx > 0 ? row.id.slice(colonIdx + 1) : row.id;
+
+          const result = await engine.query({ subject: { type: 'agent', namespace, id } });
+
+          // Extract provider snapshots from signals
+          const providerMap: ProviderSnapshots = {};
+          for (const signal of result.signals) {
+            const src = signal.provider ?? '';
+            if (src.startsWith('moltbook') && !providerMap.moltbook) {
+              providerMap.moltbook = {
+                profile_url: `https://www.moltbook.com/u/${id}`,
+              };
+            }
+            if (src.startsWith('github') && !providerMap.github) {
+              providerMap.github = {};
+            }
+            if (src.startsWith('erc8004') && !providerMap.erc8004) {
+              providerMap.erc8004 = { registry_id: namespace === 'erc8004' ? id : undefined };
+            }
+            if (src.startsWith('clawhub') && !providerMap.clawhub) {
+              providerMap.clawhub = {};
+            }
+            if (src.startsWith('twitter') && !providerMap.twitter) {
+              providerMap.twitter = {};
+            }
+          }
+
+          const summary: AgentSummary = {
+            id: row.id,
+            name: result.subject?.toString() ?? row.name,
+            description: row.description ?? undefined,
+            entity_type: row.entity_type ?? 'agent',
+            trust_score: result.trust_score,
+            confidence: result.confidence,
+            risk_level: result.risk_level,
+            recommendation: result.recommendation,
+            protocols: row.protocols ?? [namespace],
+            capabilities: row.capabilities ?? [],
+            claimed: row.claimed ?? false,
+            providers: providerMap,
+            endpoints: {
+              trust_score: `https://api.trstlyr.ai/v1/trust/score/${encodeURIComponent(row.id)}`,
+              trust_gate: 'https://api.trstlyr.ai/v1/trust/gate',
+              badge_svg: `https://api.trstlyr.ai/v1/trust/score/${encodeURIComponent(row.id)}/badge.svg`,
+            },
+            linked_identifiers: [],
+            last_updated: result.evaluated_at,
+          };
+
+          return summary;
+        }),
       );
 
-      // ── Build summaries, apply post-scoring filters ────────────────────────
-      const summaries: AgentSummary[] = [];
-      for (const outcome of scored) {
-        if (outcome.status === 'rejected') continue;
-        const { agent, result } = outcome.value;
+      // ── Collect fulfilled results ──────────────────────────────────────────────
+      let agents: AgentSummary[] = scored
+        .filter((r): r is PromiseFulfilledResult<AgentSummary> => r.status === 'fulfilled')
+        .map(r => r.value);
 
-        // Post-scoring filters
-        if (result.trust_score < minScore || result.trust_score > maxScore) continue;
-        if (result.confidence < minConf) continue;
+      // ── Post-scoring filters ──────────────────────────────────────────────────
+      agents = agents.filter(a =>
+        a.trust_score >= minScore &&
+        a.trust_score <= maxScore &&
+        a.confidence >= minConfidence &&
+        (claimedFilter === undefined || a.claimed === claimedFilter) &&
+        (capabilities.length === 0 || capabilities.some(c => a.capabilities.includes(c))) &&
+        (protocols.length === 0 || protocols.some(p => a.protocols.includes(p))) &&
+        (q === undefined || a.name.toLowerCase().includes(q.toLowerCase()) || (a.description ?? '').toLowerCase().includes(q.toLowerCase()))
+      );
 
-        const providerSnap = extractProviderSnapshot(result.signals as Array<{ provider: string; evidence: Record<string, unknown> }>);
+      // ── Sort ─────────────────────────────────────────────────────────────────
+      if (sort === 'confidence') {
+        agents.sort((a, b) => b.confidence - a.confidence);
+      } else if (sort === 'updated_at') {
+        agents.sort((a, b) => new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime());
+      } else {
+        // Default: trust_score desc
+        agents.sort((a, b) => b.trust_score - a.trust_score);
+      }
 
-        summaries.push({
-          id:           agent.id,
-          name:         agent.name,
-          description:  agent.description,
-          entity_type:  agent.entity_type,
-          trust_score:  result.trust_score,
-          confidence:   result.confidence,
-          risk_level:   result.risk_level,
-          recommendation: result.recommendation,
-          protocols:    agent.protocols,
-          capabilities: agent.capabilities,
-          claimed:      agent.claimed,
-          providers:    providerSnap,
-          endpoints:    buildEndpoints(agent.id, agent.metadata),
-          linked_identifiers: [],
-          last_updated: result.evaluated_at,
+      // ── Paginate ──────────────────────────────────────────────────────────────
+      const paginated = usingFallback ? agents.slice(offset, offset + limit) : agents.slice(0, limit);
+
+      return reply
+        .header('X-Free-Queries-Remaining', String(remaining))
+        .send({
+          agents: paginated,
+          total: usingFallback ? agents.length : total,
+          limit,
+          offset,
+          query_ms: Date.now() - startMs,
+          evaluated_at: new Date().toISOString(),
+          ...(usingFallback ? { note: 'agent_index empty — returning live-scored fallback agents' } : {}),
         });
-      }
-
-      // ── Sort ───────────────────────────────────────────────────────────────
-      if (sort === 'trust_score') {
-        summaries.sort((a, b) => b.trust_score - a.trust_score);
-      } else if (sort === 'confidence') {
-        summaries.sort((a, b) => b.confidence - a.confidence);
-      }
-      // updated_at: already in insertion order from DB
-
-      // ── Paginate ───────────────────────────────────────────────────────────
-      const page = summaries.slice(offset, offset + limit);
-
-      return reply.send({
-        agents:       page,
-        total:        total,
-        limit,
-        offset,
-        query_ms:     Date.now() - startMs,
-        evaluated_at: new Date().toISOString(),
-      });
     },
   );
-}
-
-// ─── Parse "namespace:id" subject string ─────────────────────────────────────
-
-function parseSubject(raw: string): { namespace: string; id: string } {
-  const colonIdx = raw.indexOf(':');
-  if (colonIdx < 0) return { namespace: 'github', id: raw };
-  return {
-    namespace: raw.slice(0, colonIdx),
-    id:        raw.slice(colonIdx + 1),
-  };
 }
