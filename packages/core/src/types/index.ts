@@ -60,10 +60,20 @@ export interface FraudSignal {
   detected_at: string;
 }
 
+export interface ScoreInterpretation {
+  summary: string;           // plain English e.g. "Reasonably trusted, good certainty"
+  signal_count: number;      // how many signals contributed
+  signal_diversity: number;  // unique contributing providers / 5 (total possible)
+  sybil_resistance: 'low' | 'medium' | 'high';
+}
+
 export interface TrustResult {
   subject: string;           // Full Aegis subject identifier
   trust_score: number;       // Projected score: b + a×u
   confidence: number;        // 1 - uncertainty
+  uncertainty: number;       // raw SL uncertainty (= 1 - confidence), 0-1
+  valid_until: string;       // ISO 8601 — evaluated_at + min(signal ttl, default 3600s)
+  score_interpretation: ScoreInterpretation;
   risk_level: RiskLevelResult;
   recommendation: RecommendationType;
   entity_type: EntityType;        // What kind of thing is being evaluated

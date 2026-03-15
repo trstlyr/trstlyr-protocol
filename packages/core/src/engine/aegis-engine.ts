@@ -114,10 +114,19 @@ export class AegisEngine {
     }
 
     if (dispatchPairs.length === 0) {
+      const evaluatedAt = new Date();
       const result: TrustResult = {
         subject: subjectKey,
         trust_score: 0,
         confidence: 0,
+        uncertainty: 1,
+        valid_until: new Date(evaluatedAt.getTime() + 3600 * 1000).toISOString(),
+        score_interpretation: {
+          summary: 'Low trust, very low certainty — more signals needed',
+          signal_count: 0,
+          signal_diversity: 0,
+          sybil_resistance: 'low',
+        },
         risk_level: 'critical',
         recommendation: 'deny',
         entity_type: detectEntityType(subject.namespace, subject.id),
@@ -127,13 +136,13 @@ export class AegisEngine {
           type: 'no_providers',
           severity: 'critical',
           description: `No signal providers support namespace "${subject.namespace}"`,
-          detected_at: new Date().toISOString(),
+          detected_at: evaluatedAt.toISOString(),
         }],
         unresolved: [{
           provider: 'none',
           reason: `No providers support namespace "${subject.namespace}"`,
         }],
-        evaluated_at: new Date().toISOString(),
+        evaluated_at: evaluatedAt.toISOString(),
         metadata: { query_id: crypto.randomUUID() },
       };
       return result;
@@ -218,10 +227,54 @@ export class AegisEngine {
 
     const entityType = detectEntityType(subject.namespace, subject.id);
 
+    const confidence = Math.round((1 - fusedOpinion.uncertainty) * 10_000) / 10_000;
+    const uncertainty = Math.round(fusedOpinion.uncertainty * 10_000) / 10_000;
+    const trustScore = Math.round(adjustedScore * 10_000) / 100; // 0-100 scale, 2 dp
+
+    // valid_until: evaluated_at + min(signal TTL, default 3600s)
+    const evaluatedAt = new Date();
+    const minTtl = allSignals.length > 0
+      ? Math.min(...allSignals.map((s) => s.ttl ?? 3600))
+      : 3600;
+    const validUntil = new Date(evaluatedAt.getTime() + minTtl * 1000).toISOString();
+
+    // score_interpretation
+    const scoreBucket =
+      trustScore < 40 ? 'Low trust'
+      : trustScore < 60 ? 'Moderate trust'
+      : trustScore < 75 ? 'Reasonably trusted'
+      : trustScore < 90 ? 'Trusted'
+      : 'Highly trusted';
+    const confBucket =
+      confidence < 0.4 ? 'very low certainty — more signals needed'
+      : confidence < 0.6 ? 'moderate certainty'
+      : confidence < 0.8 ? 'good certainty'
+      : 'high certainty';
+
+    const contributingSignals = allSignals.filter((s) => s.confidence > 0.3);
+    const uniqueProviders = new Set(contributingSignals.map((s) => s.provider));
+    const signalDiversity = Math.round((uniqueProviders.size / 5) * 10_000) / 10_000;
+
+    const hasOnChain = allSignals.some(
+      (s) => s.provider === 'erc8004' || s.signal_type.includes('on_chain'),
+    );
+    const sybilResistance: 'low' | 'medium' | 'high' =
+      hasOnChain ? 'high'
+      : uniqueProviders.size >= 2 ? 'medium'
+      : 'low';
+
     let result: TrustResult = {
       subject: subjectKey,
-      trust_score: Math.round(adjustedScore * 10_000) / 100,   // 0-100 scale, 2 dp
-      confidence: Math.round((1 - fusedOpinion.uncertainty) * 10_000) / 10_000, // 0-1 scale
+      trust_score: trustScore,
+      confidence,
+      uncertainty,
+      valid_until: validUntil,
+      score_interpretation: {
+        summary: `${scoreBucket}, ${confBucket}`,
+        signal_count: allSignals.length,
+        signal_diversity: signalDiversity,
+        sybil_resistance: sybilResistance,
+      },
       risk_level: riskLevel,
       recommendation,
       entity_type: entityType,
@@ -229,7 +282,7 @@ export class AegisEngine {
       signals: allSignals,
       fraud_signals: fraudSignals,
       unresolved,
-      evaluated_at: new Date().toISOString(),
+      evaluated_at: evaluatedAt.toISOString(),
       metadata: { query_id: crypto.randomUUID() },
     };
 
