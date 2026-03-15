@@ -610,7 +610,6 @@ server.get('/.well-known/agent.json', async (_request, reply) => {
         { id: 'attest',            name: 'On-chain Attestation',  description: 'Anchor trust scores as EAS attestations on Base Mainnet' },
         { id: 'trust_gate',        name: 'Trust Gate',            description: 'Pre-trade / pre-action trust check — returns proceed:true/false with score, risk, and threshold context', tags: ['trading', 'risk', 'compliance'] },
         { id: 'discover',          name: 'Agent Discovery',       description: 'Find and rank agents by capability, protocol, and trust score across ERC-8004, A2A, MCP, ACP, ClawHub, Moltbook, and HOL.org', tags: ['discovery', 'search', 'registry'] },
-        { id: 'discover',          name: 'Agent Discovery',       description: 'Search and filter agents by capability, protocol, and trust score', tags: ['discovery', 'search', 'registry'] },
       ],
       trstlyrScoreUrl: 'https://api.trstlyr.ai/v1/trust/score/erc8004:31977',
       trustGateEndpoint: 'https://api.trstlyr.ai/v1/trust/gate',
@@ -629,6 +628,34 @@ server.get('/skill.md', async (_request, reply) => {
       .send(content);
   } catch {
     return reply.code(404).send({ error: 'skill.md not found' });
+  }
+});
+
+// GET /agent.json — DevSpot Agent Manifest
+server.get('/agent.json', async (_request, reply) => {
+  try {
+    const agentPath = join(process.cwd(), 'agent.json');
+    const content = readFileSync(agentPath, 'utf8');
+    return reply
+      .header('Content-Type', 'application/json')
+      .header('Cache-Control', 'public, max-age=300')
+      .send(JSON.parse(content));
+  } catch {
+    return reply.code(404).send({ error: 'agent.json not found' });
+  }
+});
+
+// GET /agent_log.json — DevSpot execution log (autonomous decision trail)
+server.get('/agent_log.json', async (_request, reply) => {
+  try {
+    const logPath = join(process.cwd(), 'agent_log.json');
+    const content = readFileSync(logPath, 'utf8');
+    return reply
+      .header('Content-Type', 'application/json')
+      .header('Cache-Control', 'public, max-age=60')
+      .send(JSON.parse(content));
+  } catch {
+    return reply.code(404).send({ error: 'agent_log.json not found' });
   }
 });
 
