@@ -27,6 +27,9 @@ COPY --from=build /app/packages/core/dist /deploy/node_modules/@aegis-protocol/c
 COPY --from=build /app/apps/api/dist      /deploy/dist
 # Agent-readable skill manifest — served at GET /skill.md
 COPY --from=build /app/skill.md           /deploy/skill.md
+# DevSpot agent manifest + execution log
+COPY --from=build /app/agent.json         /deploy/agent.json
+COPY --from=build /app/agent_log.json     /deploy/agent_log.json
 # Chain config (EAS schema UID, network)
 COPY --from=build /app/config             /deploy/config
 
