@@ -607,7 +607,7 @@ server.get('/.well-known/agent.json', async (_request, reply) => {
         { id: 'trust_query',       name: 'Trust Query',           description: 'Evaluate trust score for an agent, skill, or GitHub repo' },
         { id: 'trust_batch',       name: 'Batch Trust Query',     description: 'Evaluate up to 20 subjects in one call' },
         { id: 'identity_register', name: 'Identity Registration', description: 'Register and verify agent identities across namespaces' },
-        { id: 'attest',            name: 'On-chain Attestation',  description: 'Anchor trust scores as EAS attestations on Base Mainnet' },
+        { id: 'attest',            name: 'On-chain Attestation',  description: 'Anchor trust scores as EAS attestations on Base Mainnet. First attestation free. Subsequent via x402 micropayment ($0.01 USDC) — compatible with AgentCash wallet.' },
         { id: 'trust_gate',        name: 'Trust Gate',            description: 'Pre-trade / pre-action trust check — returns proceed:true/false with score, risk, and threshold context', tags: ['trading', 'risk', 'compliance'] },
         { id: 'discover',          name: 'Agent Discovery',       description: 'Find and rank agents by capability, protocol, and trust score across ERC-8004, A2A, MCP, ACP, ClawHub, Moltbook, and HOL.org', tags: ['discovery', 'search', 'registry'] },
         { id: 'self_verify',       name: 'Self Protocol Verification', description: 'Check whether an agent has a ZK proof-of-human Self Agent ID on Celo Mainnet', tags: ['identity', 'zk', 'proof-of-human'] },

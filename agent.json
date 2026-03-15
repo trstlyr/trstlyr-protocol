@@ -38,7 +38,7 @@
     },
     {
       "name": "attest",
-      "description": "Anchor trust scores as EAS attestations on Base Mainnet. First attestation free; subsequent via x402 micropayment ($0.01 USDC).",
+      "description": "Anchor trust scores as EAS attestations on Base Mainnet. First attestation free. Subsequent via x402 micropayment ($0.01 USDC) — compatible with AgentCash wallet.",
       "endpoint": "https://api.trstlyr.ai/v1/attest",
       "method": "POST"
     },
@@ -111,5 +111,10 @@
   "skill_manifest": "https://api.trstlyr.ai/skill.md",
   "eas_schema_uid": "0xfff1179b55bf0717c0a071da701b4f597a6bfe0669bcb1daca6a66f0e14d407d",
   "live_trust_score": "https://api.trstlyr.ai/v1/trust/score/erc8004:31977",
+  "submissionMetadata": {
+    "hackathon": "Synthesis",
+    "track": "Build with AgentCash",
+    "x402_integration": "Produces x402-gated attestation API (POST /v1/attest). Compatible with AgentCash wallet for autonomous micropayments. Payment proof is embedded in on-chain EAS attestation signalSummary."
+  },
   "license": "Apache-2.0"
 }

@@ -10,7 +10,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { AegisEngine } from '@aegis-protocol/core';
 import { createEASWriter } from '@aegis-protocol/core';
-import { checkAttestationGate } from '../x402/payment.js';
+import { checkAttestationGate, extractPayment } from '../x402/payment.js';
 
 interface AttestBody {
   subject?: string;
@@ -44,6 +44,16 @@ export async function registerAttestRoutes(
     const allowed = await checkAttestationGate(request, reply, subject, resourceUrl);
     if (!allowed) return; // 402 (or 400) already sent
 
+    // Extract payment nonce for on-chain proof (if payment was made)
+    let paymentProof: string | undefined;
+    try {
+      const payment = extractPayment(request);
+      const nonce = payment?.payload?.authorization?.nonce;
+      if (nonce) paymentProof = `0x${nonce.replace(/^0x/, '')}`;
+    } catch {
+      // Non-fatal — payment was already verified by the gate
+    }
+
     // Parse subject into namespace + id
     const colonIdx = subject.indexOf(':');
     const namespace = colonIdx > 0 ? subject.slice(0, colonIdx) : 'github';
@@ -57,7 +67,7 @@ export async function registerAttestRoutes(
     const writer = getWriter();
     if (writer) {
       try {
-        const attestation = await writer.attest(result);
+        const attestation = await writer.attest(result, { paymentProof });
         attestationUid = attestation.uid;
       } catch (err) {
         // Non-fatal — return the trust result even if attestation fails

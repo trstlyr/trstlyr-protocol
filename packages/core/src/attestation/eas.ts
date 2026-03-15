@@ -93,7 +93,7 @@ export class EASWriter {
    * Write a TrustResult as an on-chain EAS attestation.
    * Returns the attestation UID which can be stored on the TrustResult.
    */
-  async attest(result: TrustResult): Promise<AttestationResult> {
+  async attest(result: TrustResult, options?: { paymentProof?: string }): Promise<AttestationResult> {
     // Scale scores to uint256 (× 1e18)
     // trust_score is 0-100; scale to 0-1e18 for on-chain storage
     const trustScoreScaled  = BigInt(Math.round((result.trust_score / 100) * 1e9)) * BigInt(1e9);
@@ -103,9 +103,14 @@ export class EASWriter {
 
     // Signal summary — include top signal types as a compact string
     // (full evidence stays off-chain; this gives on-chain visibility without PII)
-    const signalSummary = result.signals
+    let signalSummary = result.signals
       .map(s => `${s.provider}:${s.signal_type}:${s.score.toFixed(2)}`)
       .join(',') || 'no_signals';
+
+    // Append payment proof if x402 payment was made
+    if (options?.paymentProof) {
+      signalSummary += `,payment:${options.paymentProof}`;
+    }
 
     const queryId = result.metadata?.query_id ?? 'unknown';
 
