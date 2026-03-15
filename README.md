@@ -1,248 +1,163 @@
 # TrstLyr Protocol
 
-**The trust layer for the agent internet.**
+**Before your agent trusts another agent with money, code, or data — it checks TrstLyr.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Live](https://img.shields.io/badge/status-live-brightgreen)](https://trstlyr.ai)
+[![Live](https://img.shields.io/badge/API-live-brightgreen)](https://api.trstlyr.ai)
 [![ERC-8004](https://img.shields.io/badge/ERC--8004-compatible-green)](https://eips.ethereum.org/EIPS/eip-8004)
 [![EAS](https://img.shields.io/badge/attestation-EAS%20on%20Base-purple)](https://attest.org)
 
+TrstLyr is the trust layer for the agent internet. It aggregates signals from GitHub, ERC-8004, Twitter/X, Self Protocol ZK proof-of-human, ClawHub, and Moltbook into verifiable trust scores — anchored on-chain via EAS on Base. Open source, Apache 2.0, free to query.
+
 ---
 
-TrstLyr answers one question: **"How much should I trust this agent or skill?"**
-
-It is the **Gitcoin Passport for agents** — aggregating trust signals from GitHub, Twitter/X, ClawHub, ERC-8004 (on-chain), and Moltbook into a single, portable, evidence-backed trust score. No wallet required to start. Progressive security as stakes increase.
+## Try it now
 
 ```bash
-curl https://api.trstlyr.ai/v1/trust/score/github:tankcdr
+curl https://api.trstlyr.ai/v1/trust/score/github:yourusername
 ```
 
 ```json
 {
-  "subject": "github:tankcdr",
+  "subject": "github:yourusername",
   "trust_score": 50.1,
   "confidence": 0.72,
   "risk_level": "medium",
   "recommendation": "review",
-  "signals": [...]
+  "signals": [ "..." ]
 }
 ```
 
----
-
-## The Problem
-
-A credential stealer was discovered on ClawHub in January 2026 disguised as a weather skill. It read agent credentials from `~/.clawdbot/.env` and exfiltrated them to an external webhook. Detection was accidental.
-
-This is not a ClawHub problem. It is an ecosystem problem:
-
-- **Skills are unsigned.** Anyone can publish. No identity verification, no audit trail.
-- **Agents have no reputation.** MCP tool calls, A2A task delegations, ClawHub installs — none build verifiable history.
-- **There is no cross-platform standard.** A high-reputation Moltbook agent is unknown to ClawHub. An ERC-8004 registered agent is invisible to Twitter.
-
-The agent internet is growing faster than its trust infrastructure. TrstLyr is that infrastructure.
+No API key. No wallet. No signup.
 
 ---
 
-## Why Not Just Use ERC-8004?
+## Why it matters
 
-[ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) is excellent — TrstLyr consumes it as a signal source. But ERC-8004 itself states: *"We expect reputation systems around reviewers/clientAddresses to emerge."*
-
-**TrstLyr is that system.**
-
-| | ERC-8004 | TrstLyr |
-|---|---|---|
-| Web2 signals (GitHub, Twitter) | ❌ | ✅ |
-| No wallet required | ❌ | ✅ |
-| Pluggable signal providers | ❌ | ✅ |
-| Fraud detection | ❌ | ✅ |
-| Context-aware scoring | ❌ | ✅ |
-| EAS attestation anchoring | ❌ | ✅ |
-| Identity verification flow | ❌ | ✅ |
-
-TrstLyr is the aggregation layer above ERC-8004 — not a replacement.
+- **Agents are making real decisions with real money.** A credential stealer disguised as a weather skill sat on ClawHub for weeks before accidental discovery. There is no trust infrastructure — until now.
+- **No single signal is enough.** A fresh GitHub account can have an on-chain ERC-8004 token. A high-karma Moltbook agent can be a Sybil. TrstLyr fuses signals from 6 providers and makes honest behavior the mathematically dominant strategy (Ev-Trust, [arXiv:2512.16167](https://arxiv.org/abs/2512.16167)).
+- **Trust should be infrastructure, not a product.** Like DNS or SSL, trust is a public good. Free core API. Self-hostable. Apache 2.0 forever.
 
 ---
 
-## How It Works
+## Quick start
 
-```
-┌──────────────────────────────────────────────┐
-│              Trust Query API                 │
-│   POST /v1/trust/query   ·   Anonymous OK    │
-└──────────────────┬───────────────────────────┘
-                   │
-┌──────────────────▼───────────────────────────┐
-│          Trust Aggregation Engine            │
-│                                              │
-│  Subjective Logic opinion fusion             │
-│  (belief, disbelief, uncertainty)            │
-│                                              │
-│  Ev-Trust evolutionary stability penalty     │
-│  Context-aware weight adjustment             │
-└──────────────────┬───────────────────────────┘
-                   │
-      ┌────────────┼─────────────┐
-      ▼            ▼             ▼
- ┌─────────┐  ┌─────────┐  ┌──────────┐
- │  Web2   │  │  Web3   │  │ Identity │
- │ Signals │  │ Signals │  │  Graph   │
- ├─────────┤  ├─────────┤  ├──────────┤
- │ GitHub  │  │ERC-8004 │  │ Twitter  │
- │ ClawHub │  │  EAS    │  │ GitHub   │
- │Moltbook │  │  x402   │  │ Wallet   │
- │ Twitter │  │         │  │          │
- └─────────┘  └─────────┘  └──────────┘
-                   │
-┌──────────────────▼───────────────────────────┐
-│           EAS Attestation (Base L2)          │
-│   On-chain anchor · ~$0.01 per attestation   │
-└──────────────────────────────────────────────┘
-```
-
-### Trust is not a number — it is an opinion
-
-TrstLyr uses **Subjective Logic** (Jøsang, 2001) internally. Trust is expressed as `(belief, disbelief, uncertainty)` — distinguishing "no data yet" from "conflicting evidence." The API surfaces this as `trust_score` + `confidence`.
-
-### Honest behavior is the dominant strategy
-
-The scoring model incorporates **Ev-Trust** dynamics (Wang et al., arXiv:2512.16167): an evolutionary stability penalty makes gaming the system mathematically unprofitable compared to consistent honest behavior.
-
----
-
-## Key Features
-
-- **One API, all signal sources** — GitHub, ClawHub, ERC-8004, Twitter, Moltbook. Query once; TrstLyr fans out.
-- **Identity verification** — Agents prove ownership of Twitter, GitHub, or on-chain identities. Verified identities get richer signals.
-- **Progressive trust** — Low-stakes interactions use web2 signals. High-stakes require on-chain attestations.
-- **MCP native** — Drop-in trust oracle for Claude Desktop and any MCP-compatible runtime.
-- **EAS attestations** — Anchor any trust score on Base Mainnet. First one free, then $0.01 USDC via x402.
-- **Protocol, not product** — Open spec (Apache 2.0). Embed it; extend it; run your own instance.
-
----
-
-## Quick Start
+### REST API
 
 ```bash
-# Query a trust score (free, no key needed)
+# Trust score (free, no key)
 curl https://api.trstlyr.ai/v1/trust/score/github:tankcdr
 
-# Register your agent identity (no API key required)
-curl -X POST https://api.trstlyr.ai/v1/identity/register \
+# Pre-action trust gate — should my agent proceed?
+curl -X POST https://api.trstlyr.ai/v1/trust/gate \
   -H "Content-Type: application/json" \
-  -d '{ "subject": { "namespace": "github", "id": "your-handle" } }'
+  -d '{"subject":"github:tankcdr","action":"delegate"}'
 
-# Anchor a score on-chain — 1 free per subject, $0.01 USDC via x402 after
+# Anchor score on-chain (1st free, then $0.01 USDC via x402)
 curl -X POST https://api.trstlyr.ai/v1/attest \
   -H "Content-Type: application/json" \
-  -d '{ "subject": "github:tankcdr" }'
-
-# Self-host
-git clone https://github.com/tankcdr/aegis && cd aegis
-cp .env.example .env
-docker compose up -d
+  -d '{"subject":"github:tankcdr"}'
 ```
 
----
+### MCP (Claude Desktop / any MCP runtime)
 
-## Documentation
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
-| Document | Description |
-|----------|-------------|
-| [**skill.md**](skill.md) | Agent-readable docs — start here if you're an agent |
-| [**Protocol Specification**](docs/SPEC.md) | Full spec — scoring model, fraud detection, governance |
-| [Architecture](docs/ARCHITECTURE.md) | Component design, data flow, deployment models |
-| [Signal Providers](docs/PROVIDERS.md) | How to build and register a provider |
+```json
+{
+  "mcpServers": {
+    "trstlyr": {
+      "command": "npx",
+      "args": ["-y", "@aegis-protocol/mcp"]
+    }
+  }
+}
+```
 
----
-
-## Project Status
-
-| Phase | Milestone | Status |
-|-------|-----------|--------|
-| 1 | Core API · GitHub · ERC-8004 · ClawHub · EAS · MCP · Identity verification · x402 | ✅ Live |
-| 2 | Disputes · Behavioral signals · EigenTrust · Twitter · Persistent graph | 🔜 Next |
-| 3 | Decentralized signals · Cross-chain · zkProofs · Governance | Planned |
-
-Built for the [Synthesis Hackathon](https://nsb.dev/synthesis-updates) (March 2026).
+Gives your agent three tools: `trust_query`, `should_proceed`, `trust_explain`.
 
 ---
 
-## Related Work
+## Providers
 
-- [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) — On-chain agent identity. TrstLyr is the aggregation layer above it.
-- [EAS](https://attest.org) — Ethereum Attestation Service. Used for on-chain trust anchoring on Base L2.
-- [x402](https://www.x402.org) — HTTP-native payments. Used for pay-per-attestation.
-- [Ev-Trust](https://arxiv.org/abs/2512.16167) — Wang et al. (2025). Evolutionary stable trust for LLM-based agent economies.
-- [OpenClaw](https://github.com/openclaw/openclaw) — Agent runtime. TrstLyr is a proposed foundation project.
-- [ClawHub](https://clawhub.com) — Skill marketplace. Signal provider.
-- [Moltbook](https://moltbook.com) — Agent social network. Signal provider.
+| Provider | What it measures | Example subject |
+|----------|-----------------|-----------------|
+| **GitHub** | Author reputation, repo health, contribution age | `github:tankcdr` |
+| **ERC-8004** | On-chain agent identity, registered services | `erc8004:32051` |
+| **Twitter/X** | Social presence, account age, verification | `twitter:@handle` |
+| **Self Protocol** | ZK proof-of-human (soulbound NFT on Celo) | `self:0xWallet` |
+| **ClawHub** | Skill installs, stars, author portfolio | `clawhub:author/handle` |
+| **Moltbook** | Agent community karma, followers, activity | `moltbook:agentname` |
+
+All providers run in parallel. One query fans out to every applicable provider.
+
+---
+
+## On-chain anchoring
+
+Trust scores are anchored as **EAS attestations on Base Mainnet**.
+
+| Detail | Value |
+|--------|-------|
+| EAS contract | `0x4200000000000000000000000000000000000021` |
+| Schema UID | `0xfff1179b...14d407d` ([view on EASScan](https://base.easscan.org)) |
+| Cost | 1st attestation per subject **free**, then **$0.01 USDC** via [x402](https://x402.org) |
+| Payment | Non-custodial — agent wallets sign EIP-3009 `transferWithAuthorization` |
+
+**How it works:** Call `POST /v1/attest` with a subject. TrstLyr computes the trust score, serializes it (subject, score, confidence, risk level, signal summary), and submits an on-chain EAS attestation. The attestation UID is returned immediately. After the first free attestation, subsequent calls return HTTP 402 with x402 payment instructions — your agent pays $0.01 USDC and the attestation is created automatically.
+
+---
+
+## Architecture
+
+```
+Agent / CLI / Platform
+        │
+        ▼
+   REST API (Fastify)           MCP Server
+        │                           │
+        ▼                           ▼
+   Trust Aggregation Engine
+   ├── Identity Resolver (cross-namespace linking)
+   ├── Signal Dispatcher (parallel fan-out, 10s timeout)
+   ├── Scoring Engine (Subjective Logic + Ev-Trust)
+   └── Cache (TTL per signal type)
+        │
+        ▼
+   6 Signal Providers ──► EAS Attestation Bridge (Base L2)
+```
+
+Self-host: `git clone https://github.com/tankcdr/aegis && docker compose up -d`
+
+Full details: [Architecture](docs/ARCHITECTURE.md) | [Specification](docs/SPEC.md) | [Provider Guide](docs/PROVIDERS.md)
 
 ---
 
 ## Contributing
 
-- Open an issue with feedback, edge cases, or new signal provider proposals
-- Submit a PR for fixes or clarifications
-- Implement a signal provider (see [Signal Providers](docs/PROVIDERS.md))
+Apache 2.0 — PRs welcome.
 
-**Discussion:** [OpenClaw Discord](https://discord.com/invite/clawd)
+**Add a new provider:**
+1. Implement the `SignalProvider` interface ([docs](docs/PROVIDERS.md))
+2. Register it in the provider index
+3. Open a PR with tests and example subjects
+
+Issues, edge cases, signal provider proposals: [GitHub Issues](https://github.com/tankcdr/aegis/issues)
+
+Discussion: [OpenClaw Discord](https://discord.com/invite/clawd)
 
 ---
 
-## Known Gotchas
+## Status
 
-### ERC-8004 Token Ownership When Registered via a Platform
+**Live.** Deployed on Railway. Serving trust queries now.
 
-If your agent is registered on ERC-8004 **through a third-party platform** (e.g. a hackathon, an onboarding service), the platform wallet — not your agent's wallet — owns the token. This means:
+| | |
+|---|---|
+| API | [api.trstlyr.ai](https://api.trstlyr.ai) |
+| Website | [trstlyr.ai](https://trstlyr.ai) |
+| MCP | `@aegis-protocol/mcp` |
+| ERC-8004 Agent ID | `32051` (Base Mainnet) |
+| License | Apache 2.0 |
 
-- You **cannot** call `setAgentURI(tokenId, newURI)` directly to update your services, metadata, or endpoints.
-- Your `service_diversity` score in TrstLyr will be `0` until services are registered, even if you publish an A2A card or MCP endpoint off-chain.
-
-**How to check who owns your token:**
-```bash
-# ownerOf(uint256) — selector 0x6352211e
-cast call 0x8004A169FB4a3325136EB29fA0ceB6D2e539a432 \
-  "ownerOf(uint256)(address)" <YOUR_AGENT_ID> \
-  --rpc-url https://mainnet.base.org
-```
-
-**Options:**
-1. Ask the platform to add a metadata update API endpoint or transfer token ownership to your wallet.
-2. Self-register a new ERC-8004 token from your own wallet using the registry directly — you will own it and can call `setAgentURI` freely.
-3. If using TrstLyr for scoring, register your A2A endpoint (`/.well-known/agent.json`) and MCP endpoint (`/skill.md`) — TrstLyr will detect them as service signals regardless of on-chain registration.
-
-**Self-registration example** (ethers.js):
-```js
-const ABI = ['function register(string uri) returns (uint256)'];
-const registry = new ethers.Contract('0x8004A169FB4a3325136EB29fA0ceB6D2e539a432', ABI, wallet);
-const tokenId = await registry.register('data:application/json;base64,...');
-```
-
-> Note: The exact register function signature may vary by registry deployment. Check the contract ABI on Basescan.
-
-
-## Public Good
-
-TrstLyr is free infrastructure for the agent internet — the same way DNS, SSL, and BGP are free infrastructure for the human internet. No agent ecosystem should have to build trust from scratch.
-
-**How it stays free:**
-- The core scoring engine and API are Apache 2.0, self-hostable forever
-- A small $0.01 USDC fee per on-chain EAS attestation keeps the attestation service running (powered by [x402](https://x402.org))
-- Everything else — trust queries, identity verification, MCP tools, badges — is free
-
-**Support the project:**
-- ⭐ Star this repo — visibility helps
-- 🐙 [GitHub Sponsors](https://github.com/sponsors/tankcdr) — sustain ongoing development
-- 🔁 [Gitcoin](https://gitcoin.co) — support in public goods funding rounds
-- 💰 ETH/USDC donations: `0x8D9623A4a9198c0bCdf4c042e95aB1c0955180bD` (Ethereum + Base)
-- 🏛️ We're actively seeking grants from Ethereum Foundation, Base, Optimism RetroPGF, and similar programs
-- 📬 For foundation partnerships or integration inquiries: [cmadison@trstlyr.ai](mailto:cmadison@trstlyr.ai)
-
-If you're building an agent framework, a skill marketplace, or any system where agents interact with agents — TrstLyr is designed to be your trust layer. [Open an issue](https://github.com/tankcdr/aegis/issues) or reach out directly.
-
-## License
-
-Apache 2.0 — free forever. See [LICENSE](LICENSE).
-
-Built by [Chris Madison](https://github.com/tankcdr) · Powered by Charon ⛵
+Built by [Chris Madison](https://github.com/tankcdr) · Powered by Charon
