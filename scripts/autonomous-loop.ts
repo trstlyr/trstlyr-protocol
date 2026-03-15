@@ -16,7 +16,7 @@ import { resolve } from 'node:path';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
-const HOL_API = 'https://api.hol.xyz/v1/agents?limit=20';
+const HOL_API = 'https://hol.org/registry/api/v1/search?limit=20&sort=newest';
 const LOG_PATH = resolve(import.meta.dirname ?? '.', '..', 'agent_log.json');
 const DRY_RUN = process.argv.includes('--dry-run');
 
