@@ -4,6 +4,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { AegisEngine } from '@aegis-protocol/core';
 import { listAgentIndex, countAgentIndex, type AgentIndexRow } from '../db.js';
+import { getPaymentReceiver } from '../x402/payment.js';
 
 // ─── HOL.org integration ───────────────────────────────────────────────────────
 // HOL.org aggregates 72k+ agents across 14 registries.
@@ -182,7 +183,7 @@ export async function registerDiscoverRoutes(
               amount_usdc: '0.001',
               network: 'Base Mainnet',
               asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-              payTo: process.env['X402_PAYMENT_RECEIVER'] ?? process.env['AEGIS_ATTESTATION_PRIVATE_KEY'] ?? '',
+              payTo: getPaymentReceiver(),
               description: 'TrstLyr /discover — 0.001 USDC per query',
             },
           });

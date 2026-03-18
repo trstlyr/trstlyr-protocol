@@ -6,7 +6,7 @@
 import type { FastifyInstance } from 'fastify';
 import { createBehavioralEASWriter } from '@aegis-protocol/core';
 import type { BehavioralAttestationData } from '@aegis-protocol/core';
-import { checkAttestationGate } from '../x402/payment.js';
+import { checkAttestationGate, extractPayment } from '../x402/payment.js';
 import {
   saveBehavioralAttestation,
   loadBehavioralAttestations,
@@ -68,9 +68,17 @@ export async function registerBehavioralRoutes(
         return reply.code(400).send({ error: '"interactionAt" is required (unix timestamp)' });
       }
 
-      // Derive attester from x402 payment or request context
-      // For now, use a header or default — the x402 gate identifies the payer
-      const attester = (request.headers['x-attester'] as string) ?? 'anonymous';
+      // Derive attester from x402 payment proof (EIP-3009 `from` = payer wallet)
+      let attester: string | undefined;
+      try {
+        const payment = extractPayment(request);
+        attester = payment?.payload?.authorization?.from?.toLowerCase();
+      } catch {
+        // No valid payment header — fall through
+      }
+      if (!attester) {
+        return reply.code(401).send({ error: 'Attester identity required — submit an x402 payment header (payer wallet is used as attester)' });
+      }
 
       // No self-attestation
       if (subject === attester) {

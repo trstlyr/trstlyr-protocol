@@ -36,6 +36,11 @@ function resolvePaymentReceiver(): string {
 
 const PAYMENT_RECEIVER = resolvePaymentReceiver();
 
+/** The wallet address that receives x402 payments (derived from AEGIS_ATTESTATION_PRIVATE_KEY). */
+export function getPaymentReceiver(): string {
+  return PAYMENT_RECEIVER;
+}
+
 // $0.01 USDC (6 decimals)
 const AMOUNT_USDC = '10000';
 
