@@ -1,0 +1,9 @@
+{
+  "schemaUid": "0xcc161b722fd96c32cb8515fe86c6c76c23aefddbf3eb9973dadc37298d1c65b9",
+  "schema": "string subject, string attester, string interactionType, uint8 outcome, uint8 rating, string evidenceURI, uint64 interactionAt, uint64 valueUSDC, bool disputed",
+  "chainId": "8453",
+  "networkName": "base",
+  "registryAddress": "0x4200000000000000000000000000000000000020",
+  "txHash": "0x16429a38b2d7b1f959d2c433858b06af2ec12839c1e6fba3a383d16b3f8b3986",
+  "registeredAt": "2026-03-18T01:52:11.301Z"
+}
