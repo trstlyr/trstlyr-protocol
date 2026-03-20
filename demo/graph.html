@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrstLyr — Identity Trust Graph</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f172a;
+    --bg-card:  #1e293b;
+    --bg-panel: #162032;
+    --blue:     #3b82f6;
+    --green:    #22c55e;
+    --yellow:   #eab308;
+    --orange:   #f97316;
+    --red:      #ef4444;
+    --purple:   #a855f7;
+    --cyan:     #06b6d4;
+    --text:     #f1f5f9;
+    --text-dim: #94a3b8;
+    --border:   #334155;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-panel);
+  }
+  .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo .hl { color: var(--blue); }
+  .logo .icon { margin-right: 6px; }
+  .tagline { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+  .header-badge {
+    font-size: 11px; font-weight: 600; padding: 4px 10px;
+    border-radius: 999px; background: #1e3a5f; color: var(--blue);
+    border: 1px solid #2563eb;
+  }
+
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ─── Graph canvas ─── */
+  #graph-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  svg#graph {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* ─── Side panel ─── */
+  .panel {
+    width: 340px;
+    min-width: 280px;
+    border-left: 1px solid var(--border);
+    background: var(--bg-panel);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .panel-section {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-section:last-child { border-bottom: none; }
+
+  .panel-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .subject-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .subject-card:hover { border-color: var(--blue); }
+  .subject-card.active { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+  .subject-card .label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--text-dim); margin-bottom: 4px;
+  }
+  .subject-card .name { font-size: 15px; font-weight: 700; }
+  .subject-card .ns {
+    font-size: 12px; color: var(--text-dim); margin-top: 2px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .score-row {
+    display: flex; align-items: center; gap: 10px; margin-top: 10px;
+  }
+  .score-pill {
+    font-size: 18px; font-weight: 800; padding: 3px 10px;
+    border-radius: 8px; min-width: 58px; text-align: center;
+  }
+  .score-pill.minimal { background: #14532d; color: var(--green); }
+  .score-pill.low     { background: #1a3a1a; color: #4ade80; }
+  .score-pill.medium  { background: #3d2a00; color: var(--yellow); }
+  .score-pill.high    { background: #3b1515; color: var(--orange); }
+  .score-pill.critical{ background: #2d1010; color: var(--red); }
+  .score-pill.loading { background: #1e293b; color: var(--text-dim); }
+
+  .risk-badge {
+    font-size: 11px; font-weight: 600; padding: 2px 8px;
+    border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .risk-badge.minimal  { background: #14532d; color: var(--green); }
+  .risk-badge.low      { background: #1a3a1a; color: #4ade80; }
+  .risk-badge.medium   { background: #3d2a00; color: var(--yellow); }
+  .risk-badge.high     { background: #3b1515; color: var(--orange); }
+  .risk-badge.critical { background: #2d1010; color: var(--red); }
+
+  .signals-list { margin-top: 8px; }
+  .signal-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  .signal-item:last-child { border-bottom: none; }
+  .signal-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .signal-provider { font-weight: 600; min-width: 80px; }
+  .signal-score { margin-left: auto; font-weight: 700; font-family: monospace; }
+  .signal-conf { font-size: 11px; color: var(--text-dim); }
+
+  .detail-section { padding: 20px; }
+  .detail-section .no-select {
+    font-size: 13px; color: var(--text-dim); text-align: center;
+    padding: 20px 0;
+  }
+
+  /* ─── Fused score box ─── */
+  .fused-card {
+    background: var(--bg-card);
+    border: 1px solid var(--blue);
+    border-radius: 10px;
+    padding: 16px;
+    margin-top: 4px;
+  }
+  .fused-title { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+  .fused-score {
+    font-size: 32px; font-weight: 800; color: var(--blue);
+    font-variant-numeric: tabular-nums;
+  }
+  .fused-meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+  /* ─── Loading overlay ─── */
+  #loading-overlay {
+    position: absolute; inset: 0; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(15,23,42,0.85); z-index: 10;
+    gap: 16px; font-size: 15px; color: var(--text-dim);
+  }
+  #loading-overlay.hidden { display: none; }
+  .spinner-lg {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── Graph styles ─── */
+  .node-label {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 12px;
+    pointer-events: none;
+    fill: var(--text);
+    font-weight: 600;
+  }
+  .node-sublabel {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 10px;
+    pointer-events: none;
+    fill: var(--text-dim);
+  }
+  .link { stroke-opacity: 0.7; }
+  .link-label {
+    font-family: -apple-system, sans-serif;
+    font-size: 10px;
+    fill: var(--text-dim);
+    pointer-events: none;
+  }
+
+  /* ─── Legend ─── */
+  .legend {
+    position: absolute;
+    bottom: 20px; left: 20px;
+    background: rgba(30,41,59,0.92);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12px;
+  }
+  .legend-title { font-weight: 700; margin-bottom: 8px; color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .legend-line { width: 24px; height: 2px; flex-shrink: 0; }
+
+  /* ─── Fetch button ─── */
+  .fetch-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--blue); color: white;
+    border: none; border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s; width: 100%;
+    justify-content: center;
+  }
+  .fetch-btn:hover { background: #2563eb; }
+  .fetch-btn:disabled { background: #1e3a5f; color: var(--text-dim); cursor: not-allowed; }
+
+  .error-msg {
+    font-size: 12px; color: var(--red); margin-top: 8px;
+    background: #2d1010; border-radius: 6px; padding: 8px 10px;
+  }
+
+  .conf-bar-bg {
+    background: var(--border); border-radius: 4px; height: 4px; flex: 1;
+  }
+  .conf-bar-fill {
+    height: 4px; border-radius: 4px; transition: width 0.3s;
+  }
+
+  @media (max-width: 700px) {
+    .layout { flex-direction: column; }
+    .panel { width: 100%; border-left: none; border-top: 1px solid var(--border); }
+    #graph-container { min-height: 350px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo"><span class="icon">⛵</span>Trstl<span class="hl">yr</span></div>
+    <div class="tagline">Identity Trust Graph — multi-signal fusion demo</div>
+  </div>
+  <div class="header-badge">Live API · api.trstlyr.ai</div>
+</header>
+
+<div class="layout">
+
+  <!-- Graph -->
+  <div id="graph-container">
+    <svg id="graph"></svg>
+
+    <div id="loading-overlay">
+      <div class="spinner-lg"></div>
+      <span id="loading-msg">Querying trust signals…</span>
+    </div>
+
+    <div class="legend">
+      <div class="legend-title">Node Type</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#3b82f6"></div> Identity (GitHub)</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#06b6d4"></div> Identity (Twitter)</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#a855f7"></div> Identity (ERC-8004)</div>
+      <div style="margin-top:8px" class="legend-title">Edge Type</div>
+      <div class="legend-row"><div class="legend-line" style="background:#22c55e"></div> Strong signal (conf ≥ 0.7)</div>
+      <div class="legend-row"><div class="legend-line" style="background:#eab308"></div> Moderate (conf 0.4–0.7)</div>
+      <div class="legend-row"><div class="legend-line" style="background:#64748b"></div> Weak / vacuous</div>
+    </div>
+  </div>
+
+  <!-- Side Panel -->
+  <div class="panel">
+
+    <div class="panel-section">
+      <div class="panel-title">Subject</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">
+        Querying real signals for Vitalik Buterin — a known public figure with presence across all supported namespaces.
+      </div>
+      <button class="fetch-btn" id="fetchBtn" onclick="loadGraph()">
+        ⚡ Load Trust Graph
+      </button>
+      <div id="fetchError" style="display:none" class="error-msg"></div>
+    </div>
+
+    <div class="panel-section" id="identities-section" style="display:none">
+      <div class="panel-title">Identities Queried</div>
+      <div id="identity-cards"></div>
+    </div>
+
+    <div class="panel-section" id="fused-section" style="display:none">
+      <div class="panel-title">Fused Trust Score</div>
+      <div class="fused-card">
+        <div class="fused-title">Cross-platform signal fusion (Subjective Logic CBF)</div>
+        <div class="fused-score" id="fusedScore">—</div>
+        <div class="fused-meta" id="fusedMeta"></div>
+      </div>
+    </div>
+
+    <div class="panel-section" id="detail-section" style="display:none">
+      <div class="panel-title">Selected Node — Signals</div>
+      <div id="signal-detail"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">How It Works</div>
+      <div style="font-size:12px;color:var(--text-dim);line-height:1.6;">
+        Each identity namespace (GitHub, Twitter, ERC-8004) runs a dedicated provider that returns trust signals with a score and confidence level. TrstLyr fuses these using <strong style="color:var(--text)">Subjective Logic</strong> Cumulative Belief Fusion — each signal is an opinion tuple (belief, disbelief, uncertainty). High-confidence signals dominate; vacuous signals (no data) don't corrupt the result.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = 'https://api.trstlyr.ai';
+
+// The subjects we'll query for this demo
+const SUBJECTS = [
+  { namespace: 'github',  id: 'vbuterin',        label: 'GitHub',   color: '#3b82f6', persona: 'Vitalik Buterin' },
+  { namespace: 'twitter', id: 'VitalikButerin',   label: 'Twitter/X',color: '#06b6d4', persona: 'vitalik.eth' },
+];
+
+let graphData = null;
+let simulation = null;
+
+// ─── Score → color ────────────────────────────────────────────────────────────
+function riskColor(level) {
+  return { minimal: '#22c55e', low: '#4ade80', medium: '#eab308', high: '#f97316', critical: '#ef4444' }[level] ?? '#94a3b8';
+}
+
+function confColor(conf) {
+  if (conf >= 0.7) return '#22c55e';
+  if (conf >= 0.4) return '#eab308';
+  return '#64748b';
+}
+
+// ─── SL helpers (client-side fusion) ─────────────────────────────────────────
+const BASE_RATE = 0.5;
+
+function sig2op(score, conf) {
+  const c = Math.min(Math.max(conf, 0), 1);
+  const s = Math.min(Math.max(score, 0), 1);
+  return { b: s * c, d: (1 - s) * c, u: 1 - c, a: BASE_RATE };
+}
+
+function fuseTwo(a, b) {
+  const denom = a.u + b.u - a.u * b.u;
+  if (denom < 1e-10) return { b: (a.b+b.b)/2, d: (a.d+b.d)/2, u: 0, a: (a.a+b.a)/2 };
+  if (Math.abs(a.u - 1) < 1e-10) return {...b};
+  if (Math.abs(b.u - 1) < 1e-10) return {...a};
+  const aDBase = denom - 2 * a.u * b.u;
+  return {
+    b: (a.b*b.u + b.b*a.u) / denom,
+    d: (a.d*b.u + b.d*a.u) / denom,
+    u: (a.u * b.u) / denom,
+    a: Math.abs(aDBase) > 1e-10
+       ? (a.a*b.u + b.a*a.u - (a.a+b.a)*a.u*b.u) / aDBase
+       : (a.a+b.a)/2
+  };
+}
+
+function fuseOpinions(ops) {
+  if (ops.length === 0) return { b: 0, d: 0, u: 1, a: BASE_RATE };
+  if (ops.length === 1) return ops[0];
+  return ops.slice(1).reduce((acc, op) => fuseTwo(acc, op), ops[0]);
+}
+
+function project(op) {
+  return Math.min(Math.max(op.b + op.a * op.u, 0), 1);
+}
+
+// ─── Load data ────────────────────────────────────────────────────────────────
+async function loadGraph() {
+  const btn = document.getElementById('fetchBtn');
+  const overlay = document.getElementById('loading-overlay');
+  const errEl = document.getElementById('fetchError');
+  btn.disabled = true;
+  overlay.classList.remove('hidden');
+  errEl.style.display = 'none';
+  document.getElementById('loading-msg').textContent = 'Querying trust signals…';
+
+  try {
+    const res = await fetch(`${API}/v1/trust/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subjects: SUBJECTS.map(s => ({ namespace: s.namespace, id: s.id })) }),
+    });
+    if (!res.ok) throw new Error(`API returned ${res.status}`);
+    const data = await res.json();
+
+    // Merge subject metadata with results
+    const results = data.results.map((r, i) => ({ ...r, meta: SUBJECTS[i] }));
+    graphData = results;
+
+    renderGraph(results);
+    renderPanel(results);
+
+  } catch (err) {
+    errEl.style.display = 'block';
+    errEl.textContent = `Error: ${err.message}`;
+    overlay.classList.add('hidden');
+    btn.disabled = false;
+  }
+}
+
+// ─── Render panel ─────────────────────────────────────────────────────────────
+function renderPanel(results) {
+  // Identity cards
+  const cardsEl = document.getElementById('identity-cards');
+  cardsEl.innerHTML = '';
+  results.forEach(r => {
+    if (r.error) return;
+    const card = document.createElement('div');
+    card.className = 'subject-card';
+    card.id = `card-${r.meta.namespace}`;
+    card.onclick = () => showDetail(r);
+    card.innerHTML = `
+      <div class="label">${r.meta.label}</div>
+      <div class="name">${r.meta.persona}</div>
+      <div class="ns">${r.subject}</div>
+      <div class="score-row">
+        <div class="score-pill ${r.risk_level}">${r.trust_score}</div>
+        <div class="risk-badge ${r.risk_level}">${r.risk_level}</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-left:auto">${r.signals?.length ?? 0} signals</div>
+      </div>
+    `;
+    cardsEl.appendChild(card);
+  });
+  document.getElementById('identities-section').style.display = 'block';
+
+  // Fused score (client-side fusion across all non-vacuous signals)
+  const allSignals = results.flatMap(r => r.signals ?? []);
+  const informativeSignals = allSignals.filter(s => s.confidence > 0);
+  const ops = informativeSignals.map(s => sig2op(s.score, s.confidence));
+  const fused = fuseOpinions(ops);
+  const fusedScore = Math.round(project(fused) * 10000) / 100;
+  const fusedConf = Math.round((1 - fused.u) * 100);
+
+  document.getElementById('fusedScore').textContent = `${fusedScore}`;
+  document.getElementById('fusedMeta').textContent =
+    `Confidence ${fusedConf}% · ${informativeSignals.length} informative signals across ${results.filter(r => !r.error).length} identities`;
+  document.getElementById('fused-section').style.display = 'block';
+  document.getElementById('detail-section').style.display = 'block';
+
+  showDetail(results[0]);
+}
+
+function showDetail(r) {
+  // Deactivate all cards
+  document.querySelectorAll('.subject-card').forEach(c => c.classList.remove('active'));
+  const card = document.getElementById(`card-${r.meta?.namespace}`);
+  if (card) card.classList.add('active');
+
+  const el = document.getElementById('signal-detail');
+  if (!r.signals?.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--text-dim)">No signals available.</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">${r.subject}</div>
+    <div class="signals-list">
+      ${r.signals.map(s => `
+        <div class="signal-item">
+          <div class="signal-dot" style="background:${confColor(s.confidence)}"></div>
+          <div>
+            <div class="signal-provider">${s.provider}</div>
+            <div class="signal-conf">${s.signal_type}</div>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div class="signal-score" style="color:${confColor(s.score)}">${(s.score * 100).toFixed(0)}%</div>
+            <div style="font-size:11px;color:var(--text-dim)">conf ${(s.confidence * 100).toFixed(0)}%</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:var(--text-dim)">
+      <strong style="color:var(--text)">SL opinion:</strong>
+      ${(function() {
+        const ops = r.signals.filter(s => s.confidence > 0).map(s => sig2op(s.score, s.confidence));
+        if (!ops.length) return 'vacuous (no informative signals)';
+        const fused = fuseOpinions(ops);
+        const p = project(fused);
+        return `b=${fused.b.toFixed(3)} d=${fused.d.toFixed(3)} u=${fused.u.toFixed(3)} → ${(p*100).toFixed(1)}`;
+      })()}
+    </div>
+  `;
+}
+
+// ─── D3 Graph ─────────────────────────────────────────────────────────────────
+function renderGraph(results) {
+  const overlay = document.getElementById('loading-overlay');
+  const container = document.getElementById('graph-container');
+  const W = container.clientWidth || 800;
+  const H = container.clientHeight || 600;
+
+  // Build nodes
+  // Node types: identity (per subject), signal provider (per unique provider)
+  const nodes = [];
+  const links = [];
+
+  // Central "Vitalik" node
+  nodes.push({ id: 'vitalik', type: 'person', label: 'Vitalik Buterin', sublabel: 'vitalik.eth', fixed: true, x: W/2, y: H/2 });
+
+  results.forEach(r => {
+    if (r.error) return;
+    const nid = r.subject;
+    nodes.push({
+      id: nid,
+      type: 'identity',
+      namespace: r.meta.namespace,
+      label: r.meta.label,
+      sublabel: r.subject,
+      score: r.trust_score,
+      risk_level: r.risk_level,
+      color: r.meta.color,
+      result: r,
+    });
+
+    // Link person → identity
+    links.push({
+      source: 'vitalik',
+      target: nid,
+      type: 'owns',
+      conf: 1,
+      label: '',
+    });
+
+    // Signal provider nodes
+    const providersSeen = new Set();
+    (r.signals ?? []).forEach(sig => {
+      if (sig.confidence === 0) return; // vacuous — skip
+      const pid = `provider:${sig.provider}`;
+      if (!providersSeen.has(pid)) {
+        providersSeen.add(pid);
+        if (!nodes.find(n => n.id === pid)) {
+          nodes.push({ id: pid, type: 'provider', label: sig.provider, sublabel: 'signal provider' });
+        }
+        links.push({
+          source: nid,
+          target: pid,
+          type: 'signal',
+          conf: sig.confidence,
+          score: sig.score,
+          label: `${(sig.score*100).toFixed(0)}% conf:${(sig.confidence*100).toFixed(0)}%`,
+        });
+      }
+    });
+  });
+
+  // D3 setup
+  const svg = d3.select('#graph')
+    .attr('width', W)
+    .attr('height', H);
+  svg.selectAll('*').remove();
+
+  // Defs: arrowheads
+  const defs = svg.append('defs');
+  ['green','yellow','gray'].forEach(c => {
+    const col = c === 'green' ? '#22c55e' : c === 'yellow' ? '#eab308' : '#64748b';
+    defs.append('marker')
+      .attr('id', `arrow-${c}`)
+      .attr('markerWidth', 6).attr('markerHeight', 6)
+      .attr('refX', 22).attr('refY', 3)
+      .attr('orient', 'auto')
+      .append('path').attr('d', 'M0,0 L0,6 L6,3 z').attr('fill', col);
+  });
+
+  const linkGroup = svg.append('g').attr('class', 'links');
+  const nodeGroup = svg.append('g').attr('class', 'nodes');
+  const labelGroup = svg.append('g').attr('class', 'labels');
+
+  // Simulation
+  simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(d => {
+      if (d.type === 'owns') return 130;
+      return 110;
+    }).strength(0.8))
+    .force('charge', d3.forceManyBody().strength(-400))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collision', d3.forceCollide(40));
+
+  // Fix central node
+  const centralNode = nodes.find(n => n.id === 'vitalik');
+  if (centralNode) { centralNode.fx = W/2; centralNode.fy = H/2; }
+
+  // Links
+  const linkEl = linkGroup.selectAll('line')
+    .data(links)
+    .enter().append('line')
+    .attr('class', 'link')
+    .attr('stroke', d => confColor(d.conf ?? 0))
+    .attr('stroke-width', d => d.type === 'owns' ? 2 : Math.max(1, (d.conf ?? 0) * 3))
+    .attr('stroke-dasharray', d => d.type === 'owns' ? '5,3' : null)
+    .attr('marker-end', d => {
+      if (d.type === 'owns') return null;
+      const c = d.conf >= 0.7 ? 'green' : d.conf >= 0.4 ? 'yellow' : 'gray';
+      return `url(#arrow-${c})`;
+    });
+
+  // Node circles
+  const nodeEl = nodeGroup.selectAll('circle')
+    .data(nodes)
+    .enter().append('circle')
+    .attr('r', d => d.type === 'person' ? 30 : d.type === 'identity' ? 22 : 16)
+    .attr('fill', d => {
+      if (d.type === 'person') return '#1e293b';
+      if (d.type === 'identity') return d.color;
+      return '#334155';
+    })
+    .attr('stroke', d => {
+      if (d.type === 'person') return '#f1f5f9';
+      if (d.type === 'identity') return riskColor(d.risk_level);
+      return '#64748b';
+    })
+    .attr('stroke-width', d => d.type === 'identity' ? 2.5 : 1.5)
+    .style('cursor', d => d.type === 'identity' ? 'pointer' : 'default')
+    .on('click', (event, d) => {
+      if (d.type === 'identity' && d.result) showDetail(d.result);
+    })
+    .call(d3.drag()
+      .on('start', (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+      .on('end', (event, d) => { if (!event.active) simulation.alphaTarget(0); if (d.type !== 'person') { d.fx = null; d.fy = null; } })
+    );
+
+  // Score labels inside identity nodes
+  nodeGroup.selectAll('text.score')
+    .data(nodes.filter(n => n.type === 'identity'))
+    .enter().append('text')
+    .attr('class', 'score')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '0.35em')
+    .attr('font-size', '11px')
+    .attr('font-weight', '700')
+    .attr('fill', '#fff')
+    .attr('pointer-events', 'none')
+    .text(d => d.score != null ? d.score.toFixed(0) : '?');
+
+  // Central node emoji
+  nodeGroup.append('text')
+    .datum(nodes.find(n => n.id === 'vitalik'))
+    .attr('text-anchor', 'middle')
+    .attr('dy', '0.35em')
+    .attr('font-size', '18px')
+    .attr('pointer-events', 'none')
+    .text('👤');
+
+  // Node labels
+  const labelEl = labelGroup.selectAll('g.nodelabel')
+    .data(nodes)
+    .enter().append('g').attr('class', 'nodelabel');
+
+  labelEl.append('text')
+    .attr('class', 'node-label')
+    .attr('text-anchor', 'middle')
+    .attr('dy', d => (d.type === 'person' ? 44 : d.type === 'identity' ? 34 : 26))
+    .text(d => d.label);
+
+  labelEl.append('text')
+    .attr('class', 'node-sublabel')
+    .attr('text-anchor', 'middle')
+    .attr('dy', d => (d.type === 'person' ? 56 : d.type === 'identity' ? 46 : 38))
+    .text(d => d.type === 'provider' ? d.sublabel : '');
+
+  simulation.on('tick', () => {
+    linkEl
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeEl.attr('cx', d => d.x).attr('cy', d => d.y);
+    nodeGroup.selectAll('text.score').attr('x', d => d.x).attr('y', d => d.y);
+    nodeGroup.selectAll('text:not(.score)').attr('x', d => d.x).attr('y', d => d.y);
+    labelEl.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  overlay.classList.add('hidden');
+  document.getElementById('fetchBtn').disabled = false;
+}
+
+// Auto-load on page open
+window.addEventListener('load', () => {
+  // Small delay so layout renders first
+  setTimeout(loadGraph, 300);
+});
+</script>
+</body>
+</html>
