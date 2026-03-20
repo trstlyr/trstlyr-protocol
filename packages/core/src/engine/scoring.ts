@@ -46,6 +46,11 @@ export function fuseTwo(a: Opinion, b: Opinion): Opinion {
     };
   }
 
+  // When one opinion is vacuous (u=1), CBF is identity — return the other opinion unchanged.
+  // Avoids a degenerate baseRate computation that produces negative projected scores.
+  if (Math.abs(a.uncertainty - 1) < 1e-10) return { ...b };
+  if (Math.abs(b.uncertainty - 1) < 1e-10) return { ...a };
+
   const aDenomBase =
     denom - 2 * a.uncertainty * b.uncertainty;
 
