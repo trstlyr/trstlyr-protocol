@@ -256,8 +256,11 @@ const MAX_ID_LEN      = 200;
 function normalizeSubjectInput(raw: string): string {
   const s = raw.trim();
 
-  // Already in namespace:id format
-  if (/^[a-z0-9_-]+:[^\s]+$/i.test(s) && !s.startsWith('http')) return s;
+  // Already in namespace:id format — lowercase the namespace
+  if (/^[a-z0-9_-]+:[^\s]+$/i.test(s) && !s.startsWith('http')) {
+    const colonIdx = s.indexOf(':');
+    return s.slice(0, colonIdx).toLowerCase() + s.slice(colonIdx);
+  }
 
   // Strip URL scheme
   const noScheme = s.replace(/^https?:\/\//i, '');
@@ -406,7 +409,11 @@ server.post('/v1/identity/register', { config: { rateLimit: { max: 20, timeWindo
     });
   }
 
-  const challenge = issueChallenge(body.subject, body.link_to);
+  // Normalize namespaces to lowercase (handles autocorrect capitalization)
+  const subject  = { namespace: body.subject.namespace.toLowerCase(),  id: body.subject.id };
+  const link_to  = body.link_to ? { namespace: body.link_to.namespace.toLowerCase(), id: body.link_to.id } : undefined;
+
+  const challenge = issueChallenge(subject, link_to);
 
   // Persist so a restart doesn't invalidate in-flight verifications
   await saveChallenge({
