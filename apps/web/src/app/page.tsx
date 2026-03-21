@@ -68,7 +68,7 @@ const RISK_STYLES: Record<string, string> = {
 const EXAMPLES = [
   'erc8004:31977',
   'github:vbuterin',
-  'github:tankcdr/aegis',
+  'github:openclaw/openclaw',
   'clawhub:skill/weather',
 ];
 
