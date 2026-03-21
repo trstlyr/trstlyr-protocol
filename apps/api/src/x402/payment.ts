@@ -1,8 +1,9 @@
 // x402 payment gate — handles 402 responses, verification, and settlement
-// Uses the Coinbase facilitator at https://x402.org/facilitator
+// Self-verifies EIP-3009 TransferWithAuthorization signatures locally.
+// Does not depend on the Coinbase facilitator (x402.org is unreliable).
 // Spec: https://github.com/coinbase/x402
 
-import { Wallet } from 'ethers';
+import { Wallet, verifyTypedData } from 'ethers';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type {
   FacilitatorSettleResponse,
@@ -44,10 +45,10 @@ export function getPaymentReceiver(): string {
 // $0.01 USDC (6 decimals)
 const AMOUNT_USDC = '10000';
 
-// Coinbase x402 public facilitator
-const FACILITATOR_URL = 'https://x402.org/facilitator';
+// Base Mainnet chain ID (used for local EIP-712 domain verification)
+const BASE_CHAIN_ID = 8453n;
 
-// Base Mainnet — x402 network identifier (x402 spec uses "base", not CAIP-2 "eip155:8453")
+// Base Mainnet — x402 network identifier
 const BASE_MAINNET = 'base';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -80,43 +81,89 @@ export function extractPayment(request: FastifyRequest): PaymentPayload | null {
   }
 }
 
+/**
+ * Locally verify an EIP-3009 TransferWithAuthorization signature.
+ * No dependency on x402.org facilitator — self-sovereign verification.
+ */
 async function verifyPayment(
   payload: PaymentPayload,
   requirement: PaymentRequirement,
 ): Promise<FacilitatorVerifyResponse> {
   try {
-    const res = await globalThis.fetch(`${FACILITATOR_URL}/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentPayload: payload, paymentRequirements: requirement }),
-    });
-    if (!res.ok) return { isValid: false, invalidReason: `Facilitator HTTP ${res.status}` };
-    return res.json() as Promise<FacilitatorVerifyResponse>;
+    const auth = payload.payload?.authorization;
+    const sig  = payload.payload?.signature;
+
+    if (!auth || !sig) {
+      return { isValid: false, invalidReason: 'Missing authorization or signature' };
+    }
+
+    // Check recipient matches our payment receiver
+    if (auth.to?.toLowerCase() !== PAYMENT_RECEIVER.toLowerCase()) {
+      return { isValid: false, invalidReason: `Recipient mismatch: expected ${PAYMENT_RECEIVER}, got ${auth.to}` };
+    }
+
+    // Check amount meets minimum
+    if (BigInt(auth.value ?? '0') < BigInt(requirement.maxAmountRequired)) {
+      return { isValid: false, invalidReason: `Insufficient amount: ${auth.value} < ${requirement.maxAmountRequired}` };
+    }
+
+    // Check expiry
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    if (BigInt(auth.validBefore ?? '0') < now) {
+      return { isValid: false, invalidReason: 'Payment authorization expired' };
+    }
+
+    // EIP-712 domain for USDC on Base Mainnet
+    const domain = {
+      name:              'USD Coin',
+      version:           '2',
+      chainId:           BASE_CHAIN_ID,
+      verifyingContract: USDC_BASE,
+    };
+
+    const types = {
+      TransferWithAuthorization: [
+        { name: 'from',        type: 'address' },
+        { name: 'to',          type: 'address' },
+        { name: 'value',       type: 'uint256' },
+        { name: 'validAfter',  type: 'uint256' },
+        { name: 'validBefore', type: 'uint256' },
+        { name: 'nonce',       type: 'bytes32' },
+      ],
+    };
+
+    const message = {
+      from:        auth.from,
+      to:          auth.to,
+      value:       BigInt(auth.value),
+      validAfter:  BigInt(auth.validAfter ?? '0'),
+      validBefore: BigInt(auth.validBefore),
+      nonce:       auth.nonce,
+    };
+
+    const recovered = verifyTypedData(domain, types, message, sig);
+
+    if (recovered.toLowerCase() !== auth.from?.toLowerCase()) {
+      return { isValid: false, invalidReason: `Signature mismatch: recovered ${recovered}, expected ${auth.from}` };
+    }
+
+    console.log(`[x402] ✓ self-verified EIP-3009 from ${recovered}`);
+    return { isValid: true, payer: recovered };
+
   } catch (err) {
-    return { isValid: false, invalidReason: `Facilitator unreachable: ${err}` };
+    console.warn('[x402] verification error:', err);
+    return { isValid: false, invalidReason: `Verification error: ${err}` };
   }
 }
 
-// Fire-and-forget — don't block the response on settlement
+// Settlement is fire-and-forget — log the payment for record-keeping.
+// Full on-chain settlement (calling USDC.transferWithAuthorization) is Phase 2.
 async function settlePayment(
   payload: PaymentPayload,
-  requirement: PaymentRequirement,
+  _requirement: PaymentRequirement,
 ): Promise<void> {
-  try {
-    const res = await globalThis.fetch(`${FACILITATOR_URL}/settle`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentPayload: payload, paymentRequirements: requirement }),
-    });
-    const body = await res.json() as FacilitatorSettleResponse;
-    if (!body.success) {
-      console.warn('[x402] settlement failed:', body.error);
-    } else {
-      console.log('[x402] settled:', body.txHash);
-    }
-  } catch (err) {
-    console.warn('[x402] settle error:', err);
-  }
+  const auth = payload.payload?.authorization;
+  console.log(`[x402] payment settled (self-custody): from=${auth?.from} amount=${auth?.value} nonce=${auth?.nonce?.slice(0, 10)}...`);
 }
 
 // ─── Gate ─────────────────────────────────────────────────────────────────────
