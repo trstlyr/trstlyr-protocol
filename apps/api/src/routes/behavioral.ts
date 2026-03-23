@@ -102,7 +102,12 @@ export async function registerBehavioralRoutes(
       // Write to EAS
       let attestationUid: string | null = null;
       let txHash: string | null = null;
+      let easError: string | undefined;
       const writer = getWriter();
+      const easWriterConfigured = writer !== null;
+      if (!easWriterConfigured) {
+        console.warn('[behavioral] EAS writer not configured — AEGIS_ATTESTATION_PRIVATE_KEY or AEGIS_BEHAVIORAL_SCHEMA_UID missing');
+      }
       if (writer) {
         try {
           const data: BehavioralAttestationData = {
@@ -121,6 +126,7 @@ export async function registerBehavioralRoutes(
           txHash = result.txHash;
         } catch (err) {
           console.warn('[behavioral] EAS write failed:', err instanceof Error ? err.message : err);
+          easError = 'on-chain anchor failed — see server logs';
         }
       }
 
@@ -147,6 +153,8 @@ export async function registerBehavioralRoutes(
         baseUrl: attestationUid
           ? `https://base.easscan.org/attestation/view/${attestationUid}`
           : null,
+        ...(easError ? { eas_error: easError } : {}),
+        ...(!easWriterConfigured ? { eas_writer_configured: false } : {}),
       });
     },
   );

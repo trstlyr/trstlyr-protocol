@@ -63,7 +63,7 @@ export interface BehavioralAttestationData {
 }
 
 export interface BehavioralAttestationResult {
-  uid: string;
+  uid: string | null;
   txHash: string;
   subject: string;
   timestamp: string;
@@ -79,6 +79,9 @@ export class BehavioralEASWriter {
     rpcUrl?: string;
     schemaUid: string;
   }) {
+    if (!options.privateKey) {
+      throw new Error('BehavioralEASWriter requires a non-empty privateKey');
+    }
     const provider = new ethers.JsonRpcProvider(options.rpcUrl ?? DEFAULT_RPC);
     this.signer = new ethers.Wallet(options.privateKey, provider);
     this.contract = new ethers.Contract(EAS_CONTRACT, EAS_ABI, this.signer);
@@ -117,6 +120,9 @@ export class BehavioralEASWriter {
     if (!receipt) throw new Error('Transaction receipt null — tx may be pending');
 
     const uid = this.extractUid(receipt);
+    if (!uid) {
+      console.warn('[behavioral-eas] Could not extract attestation UID from tx logs:', receipt.hash);
+    }
 
     return {
       uid,
@@ -130,14 +136,14 @@ export class BehavioralEASWriter {
     return this.signer.address;
   }
 
-  private extractUid(receipt: ethers.TransactionReceipt): string {
+  extractUid(receipt: { logs: ReadonlyArray<{ topics: ReadonlyArray<string>; data: string }>; hash: string }): string | null {
     const ATTESTED_TOPIC = '0x8bf46bf4cfd674fa735a3d63ec1c9ad4153f033c290341f3a588b75685141b35';
     for (const log of receipt.logs) {
       if (log.topics[0] === ATTESTED_TOPIC && log.data && log.data.length >= 66) {
         return '0x' + log.data.slice(2, 66);
       }
     }
-    return receipt.hash;
+    return null;
   }
 }
 
