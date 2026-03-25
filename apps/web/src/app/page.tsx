@@ -172,12 +172,13 @@ const PROVIDER_DESCS: Record<string, string> = {
 };
 
 export default function Home() {
-  const [input, setInput]         = useState('');
-  const [result, setResult]       = useState<TrustResult | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
-  const [queried, setQueried]     = useState('erc8004:31977');
-  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [input, setInput]           = useState('');
+  const [result, setResult]         = useState<TrustResult | null>(null);
+  const [loading, setLoading]       = useState(false);   // manual query in progress
+  const [autoLoading, setAutoLoading] = useState(true);  // initial mount fetch only
+  const [error, setError]           = useState<string | null>(null);
+  const [queried, setQueried]       = useState('erc8004:31977');
+  const [providers, setProviders]   = useState<ProviderInfo[]>([]);
 
   // Fetch live provider list
   useEffect(() => {
@@ -187,27 +188,42 @@ export default function Home() {
       .catch(() => {/* graceful degradation */});
   }, []);
 
-  const query = useCallback(async (subject: string) => {
+  const query = useCallback(async (subject: string, isAuto = false) => {
     const s = normalizeSubjectInput(subject);
     if (!s) return;
-    setLoading(true);
+    if (isAuto) {
+      setAutoLoading(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     setQueried(s);
     try {
-      const res = await fetch(`${API_BASE}/v1/trust/score/${encodeURIComponent(s)}`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
+      const res = await fetch(`${API_BASE}/v1/trust/score/${encodeURIComponent(s)}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       setResult(await res.json() as TrustResult);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Query failed');
+      if ((e as Error).name === 'AbortError') {
+        setError('Request timed out — try again');
+      } else {
+        setError(e instanceof Error ? e.message : 'Query failed');
+      }
       setResult(null);
     } finally {
       setLoading(false);
+      setAutoLoading(false);
     }
   }, []);
 
   // Load Charon's own score on mount — dogfooding the product
-  useEffect(() => { void query('erc8004:31977'); }, [query]);
+  useEffect(() => { void query('erc8004:31977', true); }, [query]);
 
+  const isLoading = loading || autoLoading;
   const color = result ? scoreColor(result.trust_score) : '#6366f1';
 
   return (
@@ -317,7 +333,7 @@ export default function Home() {
                 disabled={loading}
                 className="shrink-0 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-mono transition-colors"
               >
-                {loading ? '···' : 'Check'}
+                {loading ? '···' : 'Check →'}
               </button>
             </div>
 
@@ -327,7 +343,8 @@ export default function Home() {
                 <button
                   key={ex}
                   onClick={() => { setInput(ex); void query(ex); }}
-                  className="text-xs font-mono text-slate-600 hover:text-slate-400 bg-[#0a0a0f] border border-[#1e1e2e] hover:border-slate-700 px-2 py-0.5 rounded transition-colors"
+                  disabled={loading}
+                  className="text-xs font-mono text-slate-600 hover:text-slate-400 disabled:opacity-50 bg-[#0a0a0f] border border-[#1e1e2e] hover:border-slate-700 px-2 py-0.5 rounded transition-colors"
                 >
                   {ex}
                 </button>
@@ -342,13 +359,13 @@ export default function Home() {
             )}
 
             {/* Result */}
-            {(result || loading) && !error && (
+            {(result || isLoading) && !error && (
               <div className="space-y-4">
                 {/* Score + recommendation */}
                 <div className="flex items-center gap-5">
-                  <ScoreRing score={result?.trust_score ?? 0} color={color} loading={loading && !result} />
+                  <ScoreRing score={result?.trust_score ?? 0} color={color} loading={isLoading && !result} />
                   <div className="flex-1 min-w-0">
-                    {loading && !result ? (
+                    {isLoading && !result ? (
                       <div className="space-y-2">
                         <div className="h-4 bg-[#1e1e2e] rounded animate-pulse w-3/4" />
                         <div className="h-3 bg-[#1e1e2e] rounded animate-pulse w-1/2" />
