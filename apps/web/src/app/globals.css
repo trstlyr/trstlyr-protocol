@@ -8,6 +8,18 @@
   box-sizing: border-box;
 }
 
+/* Safari: prevent horizontal overflow on mobile */
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+/* Safari: backdrop-filter requires -webkit- prefix */
+.backdrop-blur-sm {
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
 ::selection {
   background: rgba(99, 102, 241, 0.3);
   color: white;

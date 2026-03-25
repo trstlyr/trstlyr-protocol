@@ -1,5 +1,13 @@
 import type { Metadata } from 'next';
+import type { Viewport } from 'next';
 import './globals.css';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   title: 'trstlyr.ai — Trust scores for the agent internet',

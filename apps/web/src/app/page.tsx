@@ -215,11 +215,11 @@ export default function Home() {
 
       {/* ── Nav ───────────────────────────────────────────────────────────── */}
       <nav className="sticky top-0 z-10 border-b border-[#1e1e2e] bg-[#0a0a0f]/90 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="text-lg">🛡️</span>
-            <span className="font-mono font-bold text-white tracking-tight">trstlyr.ai</span>
-            <span className="hidden sm:inline text-xs font-mono text-slate-600 bg-[#1e1e2e] px-1.5 py-0.5 rounded">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-lg shrink-0">🛡️</span>
+            <span className="font-mono font-bold text-white tracking-tight shrink-0">trstlyr.ai</span>
+            <span className="hidden sm:inline text-xs font-mono text-slate-600 bg-[#1e1e2e] px-1.5 py-0.5 rounded shrink-0">
               v0.2.0
             </span>
           </div>
@@ -247,12 +247,20 @@ export default function Home() {
           Live on Base Mainnet · EAS attestations · x402 payments
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start min-w-0">
           {/* Left — headline */}
           <div>
             <h1 className="text-4xl sm:text-5xl font-bold text-white leading-tight mb-5">
               Trust scores for the{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">
+              <span
+                className="bg-gradient-to-r from-indigo-400 to-violet-400"
+                style={{
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  color: 'transparent',
+                }}
+              >
                 agent internet
               </span>
             </h1>
@@ -302,7 +310,7 @@ export default function Home() {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && void query(input || 'erc8004:31977')}
                 placeholder="github:vbuterin · erc8004:31977"
-                className="flex-1 min-w-0 bg-[#0a0a0f] border border-[#1e1e2e] focus:border-indigo-500/50 rounded-lg px-3 py-2 text-sm font-mono text-slate-300 placeholder-slate-700 outline-none transition-colors"
+                className="flex-1 min-w-0 bg-[#0a0a0f] border border-[#1e1e2e] focus:border-indigo-500/50 rounded-lg px-3 py-2 text-sm font-mono text-slate-300 placeholder-slate-700 outline-none transition-colors w-full"
               />
               <button
                 onClick={() => void query(input || 'erc8004:31977')}
@@ -416,12 +424,12 @@ export default function Home() {
                 {providers.length > 0 ? `${providers.length} providers live` : 'Loading live status...'}
               </p>
             </div>
-            <div className="bg-[#0a0a0f] border border-[#1e1e2e] rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e1e2e]">
+            <div className="bg-[#0a0a0f] border border-[#1e1e2e] rounded-xl overflow-hidden min-w-0">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e1e2e] flex-wrap gap-1">
                 <span className="text-xs font-mono text-slate-500">Register your identity</span>
                 <span className="text-xs font-mono text-indigo-400">POST /v1/identity/register</span>
               </div>
-              <pre className="px-5 py-4 text-xs font-mono text-slate-300 overflow-x-auto leading-relaxed">
+              <pre className="px-5 py-4 text-xs font-mono text-slate-300 overflow-x-auto leading-relaxed" style={{ WebkitOverflowScrolling: 'touch' }}>
 {`# Step 1 — request a challenge
 curl -X POST https://api.trstlyr.ai/v1/identity/register \\
   -H "Content-Type: application/json" \\
@@ -490,13 +498,13 @@ curl -X POST https://api.trstlyr.ai/v1/identity/verify \\
         <h2 className="text-sm font-mono text-slate-500 uppercase tracking-widest mb-4">
           Quick start
         </h2>
-        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl overflow-hidden">
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-xl overflow-hidden min-w-0">
           <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-[#1e1e2e]">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
             <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
             <span className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
           </div>
-          <pre className="px-5 py-4 text-xs font-mono text-slate-300 overflow-x-auto leading-relaxed">
+          <pre className="px-5 py-4 text-xs font-mono text-slate-300 overflow-x-auto leading-relaxed" style={{ WebkitOverflowScrolling: 'touch' }}>
 {`# Query a trust score (free)
 curl https://api.trstlyr.ai/v1/trust/score/github:vbuterin
 
