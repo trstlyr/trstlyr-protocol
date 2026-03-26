@@ -41,30 +41,10 @@ function client(): TrstLyrClient {
 
 /**
  * Query trust score for a subject.
- * Fail-open: returns a synthetic zero-confidence result if the API is unreachable.
+ * Throws on error — callers must distinguish 'score is 0' from 'API is down'.
  */
 export async function score(subject: string): Promise<TrustScore> {
-  try {
-    return await client().score(subject);
-  } catch {
-    // Fail open: return a synthetic "unknown" result
-    return {
-      subject,
-      trust_score: 0,
-      confidence: 0,
-      uncertainty: 1,
-      valid_until: new Date().toISOString(),
-      score_interpretation: { summary: 'API unreachable — fail open', signal_count: 0, signal_diversity: 0, sybil_resistance: 'low' },
-      risk_level: 'medium',
-      recommendation: 'review',
-      entity_type: 'unknown',
-      recommendation_label: 'Review — API unreachable',
-      signals: [],
-      fraud_signals: [],
-      unresolved: [],
-      evaluated_at: new Date().toISOString(),
-    };
-  }
+  return client().score(subject);
 }
 
 /** Anchor a trust attestation on-chain (EAS on Base). */
@@ -87,9 +67,10 @@ export async function isTrusted(subject: string, minScore = 60): Promise<boolean
   try {
     const result = await client().score(subject);
     return result.trust_score >= minScore;
-  } catch {
-    // Fail open: if we can't reach the API, assume trusted
-    return true;
+  } catch (err) {
+    // Fail closed: if we can't reach the API, do not assume trusted
+    console.warn('[trstlyr] isTrusted() failed, returning false:', err);
+    return false;
   }
 }
 

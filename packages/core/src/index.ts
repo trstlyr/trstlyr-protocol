@@ -47,6 +47,7 @@ export type { BehavioralAttestationData, BehavioralAttestationResult } from './a
 // ── Types ────────────────────────────────────────────────────────────────────
 export type {
   Action,
+  TrstLyrConfig,
   AegisConfig,
   Context,
   EvaluateRequest,

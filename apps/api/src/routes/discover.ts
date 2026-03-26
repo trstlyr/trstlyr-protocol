@@ -80,9 +80,28 @@ const FALLBACK_SUBJECTS = [
 const discoverFreeTier = new Map<string, { count: number; resetAt: number }>();
 const FREE_LIMIT = 3;
 const DAY_MS = 86_400_000;
+const MAX_FREE_TIER_ENTRIES = 10_000;
 
 function checkFreeQuota(ip: string): { allowed: boolean; remaining: number } {
   const now = Date.now();
+
+  // Prune expired entries and cap Map size to prevent unbounded growth
+  if (discoverFreeTier.size > MAX_FREE_TIER_ENTRIES) {
+    for (const [key, val] of discoverFreeTier) {
+      if (now > val.resetAt) discoverFreeTier.delete(key);
+    }
+    // If still over limit after pruning expired, delete oldest entries
+    if (discoverFreeTier.size > MAX_FREE_TIER_ENTRIES) {
+      const excess = discoverFreeTier.size - MAX_FREE_TIER_ENTRIES;
+      let deleted = 0;
+      for (const key of discoverFreeTier.keys()) {
+        if (deleted >= excess) break;
+        discoverFreeTier.delete(key);
+        deleted++;
+      }
+    }
+  }
+
   const entry = discoverFreeTier.get(ip);
 
   if (!entry || now > entry.resetAt) {

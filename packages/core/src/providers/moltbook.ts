@@ -170,9 +170,17 @@ export class MoltbookProvider implements Provider {
 
   private async fetchProfile(agentName: string): Promise<MoltbookProfile> {
     const url = `${MOLTBOOK_API}/agents/profile?name=${encodeURIComponent(agentName)}`;
-    const res = await globalThis.fetch(url, {
-      headers: { Authorization: `Bearer ${this.apiKey!}` },
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    let res: Response;
+    try {
+      res = await globalThis.fetch(url, {
+        headers: { Authorization: `Bearer ${this.apiKey!}` },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (res.status === 404) throw new Error(`404: agent "${agentName}" not found on Moltbook`);
     if (res.status === 401) throw new Error('Moltbook API key invalid or expired');

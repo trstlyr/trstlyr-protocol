@@ -99,7 +99,14 @@ export class ClawHubProvider implements Provider {
   async health(): Promise<HealthStatus> {
     const lastCheck = new Date().toISOString();
     try {
-      const res = await globalThis.fetch(`${CLAWHUB_API}/skills?limit=1`);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10_000);
+      let res: Response;
+      try {
+        res = await globalThis.fetch(`${CLAWHUB_API}/skills?limit=1`, { signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
       return {
         status: res.ok ? 'healthy' : 'degraded',
         last_check: lastCheck,
@@ -278,7 +285,14 @@ export class ClawHubProvider implements Provider {
   }
 
   private async fetchSkill(slug: string): Promise<SkillDetailResponse> {
-    const res = await globalThis.fetch(`${CLAWHUB_API}/skills/${encodeURIComponent(slug)}`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    let res: Response;
+    try {
+      res = await globalThis.fetch(`${CLAWHUB_API}/skills/${encodeURIComponent(slug)}`, { signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
     if (res.status === 404) throw new Error(`404: skill "${slug}" not found`);
     if (!res.ok) throw new Error(`ClawHub API error ${res.status}`);
     const body = await res.json() as SkillDetailResponse;

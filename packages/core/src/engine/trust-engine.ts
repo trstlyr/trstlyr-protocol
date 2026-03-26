@@ -9,7 +9,7 @@ import { TTL, HTTP, FRAUD } from '../constants.js';
 //   });
 
 import type {
-  AegisConfig,
+  TrstLyrConfig,
   EvaluateRequest,
   FraudSignal,
   Provider,
@@ -49,7 +49,7 @@ export class TrustEngine {
   /** In-flight queries — deduplicates simultaneous requests for the same subject */
   private readonly inFlight = new Map<string, Promise<TrustResult>>();
 
-  constructor(config: AegisConfig = {}) {
+  constructor(config: TrstLyrConfig = {}) {
     // Build default provider set based on available env vars
     // Explicit config.providers always wins; otherwise auto-detect from env
     this.providers =
@@ -300,7 +300,7 @@ export class TrustEngine {
         };
       } catch (err) {
         // Attestation failure is non-fatal — log and continue
-        console.warn('[aegis] EAS attestation failed:', err instanceof Error ? err.message : err);
+        console.warn('[trstlyr] EAS attestation failed:', err instanceof Error ? err.message : err);
       }
     }
 

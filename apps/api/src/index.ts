@@ -574,7 +574,14 @@ server.post('/v1/trust/gate', { config: { rateLimit: { max: 120, timeWindow: '1 
   }
   if (!validateSubjectString(body.counterparty, reply)) return;
 
-  const action = (body.action ?? 'transact') as Action;
+  const VALID_ACTIONS: Action[] = ['install', 'execute', 'delegate', 'transact', 'review'];
+  const rawAction = body.action ?? 'transact';
+  if (!VALID_ACTIONS.includes(rawAction as Action)) {
+    return reply.code(400).send({
+      error: `Invalid action "${rawAction}". Must be one of: ${VALID_ACTIONS.join(', ')}`,
+    });
+  }
+  const action = rawAction as Action;
   const amountUsd = typeof body.amount_usd === 'number' ? body.amount_usd : null;
 
   // Determine threshold based on action + amount

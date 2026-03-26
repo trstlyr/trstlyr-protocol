@@ -296,11 +296,19 @@ export class ERC8004Provider implements Provider {
   }
 
   private async rpcCall(method: string, params: unknown[]): Promise<unknown> {
-    const res = await globalThis.fetch(this.rpcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    let res: Response;
+    try {
+      res = await globalThis.fetch(this.rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) throw new Error(`RPC HTTP ${res.status}`);
     const json = await res.json() as { result?: unknown; error?: { message: string } };
     if (json.error) throw new Error(`RPC error: ${json.error.message}`);

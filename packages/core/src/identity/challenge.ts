@@ -331,31 +331,55 @@ async function verifyTweet(
   throw new Error('Provide tweet_url (URL of your verification tweet) — no API key required.');
 }
 
+function validateTweetUrl(url: string): void {
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Invalid tweet URL: must be a twitter.com or x.com URL');
+  }
+  const host = parsed.hostname.replace(/^www\./, '');
+  if (host !== 'twitter.com' && host !== 'x.com') {
+    throw new Error('Invalid tweet URL: must be a twitter.com or x.com URL');
+  }
+}
+
 async function verifyTweetByUrl(tweetUrl: string, challengeString: string): Promise<boolean> {
+  validateTweetUrl(tweetUrl);
+
   const normalised = tweetUrl.replace('x.com/', 'twitter.com/');
 
   // 1. Try oEmbed — public, no auth
+  const controller1 = new AbortController();
+  const timer1 = setTimeout(() => controller1.abort(), 10_000);
   try {
     const res = await globalThis.fetch(
       `https://publish.twitter.com/oembed?url=${encodeURIComponent(normalised)}&omit_script=true`,
-      { headers: { 'User-Agent': 'TrstLyr/1.0 (+https://trstlyr.ai)' } },
+      { headers: { 'User-Agent': 'TrstLyr/1.0 (+https://trstlyr.ai)' }, signal: controller1.signal },
     );
     if (res.ok) {
       const body = await res.json() as { html?: string };
       if (body.html) return body.html.includes(challengeString);
     }
-  } catch { /* fall through */ }
+  } catch {
+    // oEmbed failed — fall through to HTML scrape only for rate-limit / temporary errors
+  } finally {
+    clearTimeout(timer1);
+  }
 
-  // 2. Fallback: raw HTML scrape
+  // 2. Fallback: HTML scrape — URL already domain-validated above
+  const controller2 = new AbortController();
+  const timer2 = setTimeout(() => controller2.abort(), 10_000);
   try {
     const res = await globalThis.fetch(normalised, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TrstLyrBot/1.0; +https://trstlyr.ai)' },
       redirect: 'follow',
+      signal: controller2.signal,
     });
     if (!res.ok) return false;
     return (await res.text()).includes(challengeString);
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer2);
   }
 }
 
@@ -365,10 +389,17 @@ async function verifyTweetByBearerToken(
   bearerToken: string,
 ): Promise<boolean> {
   const clean = username.replace(/^@/, '');
-  const res = await globalThis.fetch(
-    `https://api.twitter.com/2/users/by/username/${encodeURIComponent(clean)}?user.fields=description`,
-    { headers: { Authorization: `Bearer ${bearerToken}` } },
-  );
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  let res: Response;
+  try {
+    res = await globalThis.fetch(
+      `https://api.twitter.com/2/users/by/username/${encodeURIComponent(clean)}?user.fields=description`,
+      { headers: { Authorization: `Bearer ${bearerToken}` }, signal: controller.signal },
+    );
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) return false;
   const body = await res.json() as { data?: { description?: string; id?: string } };
   if ((body.data?.description ?? '').includes(challengeString)) return true;
@@ -389,10 +420,23 @@ async function verifyTweetByBearerToken(
 
 // ─── Gist verification (GitHub) ───────────────────────────────────────────────
 
+function validateGistUrl(url: string): void {
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Invalid gist URL: must be a gist.github.com URL');
+  }
+  const host = parsed.hostname;
+  if (host !== 'gist.github.com' && host !== 'gist.githubusercontent.com') {
+    throw new Error('Invalid gist URL: must be a gist.github.com URL');
+  }
+}
+
 async function verifyGist(challenge: Challenge, gistUrl?: string): Promise<boolean> {
   if (!gistUrl) {
     throw new Error('Provide gist_url (URL of your public GitHub gist containing the challenge string).');
   }
+
+  validateGistUrl(gistUrl);
 
   // Accept gist.github.com/<user>/<id> or raw URL
   // Convert to raw URL for reliable text access
@@ -400,15 +444,20 @@ async function verifyGist(challenge: Challenge, gistUrl?: string): Promise<boole
     ? gistUrl
     : gistUrl.replace('gist.github.com/', 'gist.githubusercontent.com/') + '/raw';
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
   try {
     const res = await globalThis.fetch(rawUrl, {
       headers: { 'User-Agent': 'TrstLyr/1.0 (+https://trstlyr.ai)' },
       redirect: 'follow',
+      signal: controller.signal,
     });
     if (!res.ok) return false;
     return (await res.text()).includes(challenge.challengeString);
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -448,15 +497,27 @@ async function getERC8004Owner(agentId: string): Promise<string> {
   const numericId = parseInt(agentId.split(':').pop() ?? agentId, 10);
   const padded    = numericId.toString(16).padStart(64, '0');
 
-  const res = await globalThis.fetch(rpcUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0', id: 1,
-      method:  'eth_call',
-      params:  [{ to: registry, data: '0x6352211e' + padded }, 'latest'],
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
+  let res: Response;
+  try {
+    res = await globalThis.fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1,
+        method:  'eth_call',
+        params:  [{ to: registry, data: '0x6352211e' + padded }, 'latest'],
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!res.ok) {
+    throw new Error(`ERC-8004 owner lookup failed: HTTP ${res.status}`);
+  }
 
   const json = await res.json() as { result?: string };
   return '0x' + (json.result ?? '0x').slice(-40);

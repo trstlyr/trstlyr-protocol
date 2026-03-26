@@ -61,8 +61,8 @@ async function maybeExtractERC8004Links(subject: SubjectRef): Promise<void> {
         { source: 'erc8004_services_auto_extract', agent_id: agentId },
       );
     }
-  } catch {
-    // Non-fatal — if ERC-8004 lookup fails, just proceed with no links
+  } catch (err) {
+    console.warn('[trstlyr] maybeExtractERC8004Links:', err);
   }
 }
 

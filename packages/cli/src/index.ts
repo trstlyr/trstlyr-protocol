@@ -135,11 +135,16 @@ ${c.bold('EXIT CODES')}
 // ── Command handlers ──
 
 async function cmdScore(subject: string, json: boolean): Promise<void> {
-  const result = await sdkScore(subject);
-  if (json) {
-    console.log(JSON.stringify(scoreJson(result), null, 2));
-  } else {
-    console.log(formatScore(result));
+  try {
+    const result = await sdkScore(subject);
+    if (json) {
+      console.log(JSON.stringify(scoreJson(result), null, 2));
+    } else {
+      console.log(formatScore(result));
+    }
+  } catch (err) {
+    console.error(c.red(`Error scoring "${subject}": ${err instanceof Error ? err.message : String(err)}`));
+    process.exit(1);
   }
 }
 
@@ -175,11 +180,16 @@ async function cmdGate(subject: string, minScore: number, strict: boolean, json:
 }
 
 async function cmdAttest(subject: string, json: boolean): Promise<void> {
-  const result = await sdkAttest(subject);
-  if (json) {
-    console.log(JSON.stringify(result, null, 2));
-  } else {
-    console.log(formatAttestation(result));
+  try {
+    const result = await sdkAttest(subject);
+    if (json) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      console.log(formatAttestation(result));
+    }
+  } catch (err) {
+    console.error(c.red(`Error attesting "${subject}": ${err instanceof Error ? err.message : String(err)}`));
+    process.exit(1);
   }
 }
 
@@ -190,22 +200,28 @@ async function cmdBehavioral(
   value: number | undefined,
   json: boolean,
 ): Promise<void> {
-  const result = await sdkBehavioral({
-    subject,
-    outcome: outcome as 'success' | 'partial' | 'failed',
-    rating,
-    value_usd: value,
-  });
-  if (json) {
-    console.log(JSON.stringify(result, null, 2));
-  } else {
-    console.log(formatBehavioral(result));
+  try {
+    const result = await sdkBehavioral({
+      subject,
+      outcome: outcome as 'success' | 'partial' | 'failed',
+      rating,
+      value_usd: value,
+    });
+    if (json) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      console.log(formatBehavioral(result));
+    }
+  } catch (err) {
+    console.error(c.red(`Error posting behavioral attestation: ${err instanceof Error ? err.message : String(err)}`));
+    process.exit(1);
   }
 }
 
 // ── Main ──
 
 export async function main(): Promise<void> {
+  try {
   const { values, positionals } = parseArgs({
     args: process.argv.slice(2),
     options: {
@@ -270,5 +286,9 @@ export async function main(): Promise<void> {
     default:
       console.error(`Unknown command: ${command}. Run \`trstlyr help\` for usage.`);
       process.exit(1);
+  }
+  } catch (err) {
+    console.error(c.red(`Fatal error: ${err instanceof Error ? err.message : String(err)}`));
+    process.exit(1);
   }
 }

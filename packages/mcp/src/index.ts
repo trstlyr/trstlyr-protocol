@@ -13,6 +13,16 @@ import { z } from 'zod';
 import { TrustEngine } from '@trstlyr/core';
 import type { TrustResult, Action } from '@trstlyr/core';
 
+const VALID_ACTIONS: readonly string[] = ['install', 'execute', 'delegate', 'transact', 'review'];
+
+function validatedAction(action: string | undefined): Action | undefined {
+  if (!action) return undefined;
+  if (!VALID_ACTIONS.includes(action)) {
+    throw new Error(`Invalid action "${action}". Must be one of: ${VALID_ACTIONS.join(', ')}`);
+  }
+  return action as Action;
+}
+
 // ── Engine ────────────────────────────────────────────────────────────────────
 
 const engine = new TrustEngine();
@@ -156,7 +166,7 @@ server.registerTool(
       const { namespace, id } = parseSubject(subject);
       const result = await engine.query({
         subject: { type: 'agent', namespace, id },
-        context: action ? { action: action as Action } : undefined,
+        context: action ? { action: validatedAction(action)! } : undefined,
       });
       return { content: [{ type: 'text', text: formatTrustReport(result, subject) }] };
     } catch (err) {
@@ -196,7 +206,7 @@ server.registerTool(
       const { namespace, id } = parseSubject(subject);
       const result = await engine.query({
         subject: { type: 'agent', namespace, id },
-        context: action ? { action: action as Action } : undefined,
+        context: action ? { action: validatedAction(action)! } : undefined,
       });
 
       const proceed = result.trust_score >= min_score && result.recommendation !== 'deny' && result.recommendation !== 'caution';
@@ -357,7 +367,7 @@ server.registerTool(
           const { namespace, id } = parseSubject(subject);
           return engine.query({
             subject: { type: 'agent', namespace, id },
-            context: action ? { action: action as Action } : undefined,
+            context: action ? { action: validatedAction(action)! } : undefined,
           }).then(r => ({ subject, result: r }) as BatchSuccess);
         }),
       );
@@ -404,4 +414,9 @@ server.registerTool(
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 const transport = new StdioServerTransport();
-await server.connect(transport);
+try {
+  await server.connect(transport);
+} catch (err) {
+  console.error('[trstlyr-mcp] Failed to connect MCP server:', err instanceof Error ? err.message : err);
+  process.exit(1);
+}

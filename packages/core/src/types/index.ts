@@ -123,7 +123,7 @@ export interface Provider {
 
 // ─── Engine Config ────────────────────────────────────────────────────────────
 
-export interface AegisConfig {
+export interface TrstLyrConfig {
   providers?: Provider[];
   cache?: 'memory' | 'none';
   attestation?: {
@@ -137,3 +137,6 @@ export interface AegisConfig {
     providerTimeout?: number; // ms (default: 10000)
   };
 }
+
+/** @deprecated Use TrstLyrConfig instead */
+export type AegisConfig = TrstLyrConfig;

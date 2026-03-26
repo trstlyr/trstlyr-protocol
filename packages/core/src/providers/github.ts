@@ -277,7 +277,8 @@ export class GitHubProvider implements Provider {
         `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/.github/workflows`,
       );
       return res.ok;
-    } catch {
+    } catch (err) {
+      console.warn('[trstlyr] fetchHasCI:', err);
       return false;
     }
   }
@@ -289,7 +290,8 @@ export class GitHubProvider implements Provider {
         `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?since=${since}&per_page=100`,
       );
       return Array.isArray(commits) ? commits.length : 0;
-    } catch {
+    } catch (err) {
+      console.warn('[trstlyr] fetchRecentCommits:', err);
       return 0;
     }
   }
@@ -301,7 +303,8 @@ export class GitHubProvider implements Provider {
         `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contributors?per_page=30&anon=false`,
       );
       return Array.isArray(contributors) ? contributors.length : 0;
-    } catch {
+    } catch (err) {
+      console.warn('[trstlyr] fetchContributorCount:', err);
       return 0;
     }
   }
@@ -309,22 +312,35 @@ export class GitHubProvider implements Provider {
   private async fetchRaw(path: string): Promise<Response> {
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'aegis-protocol/1.0',
+      'User-Agent': 'trstlyr-protocol/1.0',
     };
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
-    return globalThis.fetch(`${this.baseUrl}${path}`, { headers }); // raw fetch for streaming
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    try {
+      return await globalThis.fetch(`${this.baseUrl}${path}`, { headers, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private async fetch<T>(path: string): Promise<T> {
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'aegis-protocol/1.0',
+      'User-Agent': 'trstlyr-protocol/1.0',
     };
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const res = await globalThis.fetch(`${this.baseUrl}${path}`, { headers });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    let res: Response;
+    try {
+      res = await globalThis.fetch(`${this.baseUrl}${path}`, { headers, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (res.status === 404) {
       throw new Error(`404 Not Found: ${path}`);

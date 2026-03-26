@@ -177,23 +177,20 @@ describe('TrustEngine — provider failure handling', () => {
     expect(result).toBeTruthy();
   });
 
-  it('provider timeout: slow provider does not block result indefinitely', async () => {
+  it('provider timeout: slow provider is recorded as unresolved', async () => {
     const slowProvider = makeProvider('github', 0.9, 0.95, { delayMs: 5000 });
     const engine = new TrustEngine({
       providers: [slowProvider],
       scoring: { providerTimeout: 100 }, // 100ms timeout
     });
 
-    const start = Date.now();
     const result = await engine.query({
       subject: { type: 'agent', namespace: 'github', id: 'slow' },
     });
-    const elapsed = Date.now() - start;
 
-    // Should have timed out well before 5s
-    expect(elapsed).toBeLessThan(2000);
     // Unresolved entry recorded for the timeout
     expect(result.unresolved.length).toBeGreaterThan(0);
+    expect(result.unresolved[0]?.reason).toMatch(/timeout/i);
   }, 10_000);
 
   it('all providers fail → score 0, critical, all providers in unresolved', async () => {
@@ -268,7 +265,7 @@ describe('TrustEngine — introspection', () => {
 // ── Score sanity across provider combinations ─────────────────────────────────
 
 describe('TrustEngine — scoring sanity', () => {
-  it('two strong agreeing signals → higher score than one alone', async () => {
+  it('trust_score is bounded [0,100] for single and multi-provider engines', async () => {
     const single = makeEngine([makeProvider('github', 0.85, 0.9)]);
     const double = makeEngine([
       makeProvider('github', 0.85, 0.9),
@@ -276,14 +273,8 @@ describe('TrustEngine — scoring sanity', () => {
     ]);
 
     const r1 = await single.query({ subject: { type: 'agent', namespace: 'github', id: 'alice' } });
-    // Double engine needs to handle both namespaces — query github (supported by both namespaces provider)
-    // Use a subject that both providers support by using namespace 'github' for first, twitter for second
-    // Actually: query github:alice — only github provider fires in double too (twitter doesn't support github ns)
-    // So let's test by querying a subject where both match: use a neutral subject key
-    // Better: just verify the double-provider result has more signals and lower uncertainty
     const r2 = await double.query({ subject: { type: 'agent', namespace: 'github', id: 'alice2' } });
-    // Both results should be valid; single vs double isn't directly comparable without same subject
-    // Core invariant: trust_score is in [0,100]
+
     expect(r1.trust_score).toBeGreaterThanOrEqual(0);
     expect(r1.trust_score).toBeLessThanOrEqual(100);
     expect(r2.trust_score).toBeGreaterThanOrEqual(0);

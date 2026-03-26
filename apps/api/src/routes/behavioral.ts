@@ -67,6 +67,16 @@ export async function registerBehavioralRoutes(
       if (!interactionAt || typeof interactionAt !== 'number') {
         return reply.code(400).send({ error: '"interactionAt" is required (unix timestamp)' });
       }
+      if (evidenceURI !== undefined && evidenceURI !== null) {
+        try {
+          const parsed = new URL(evidenceURI);
+          if (parsed.protocol !== 'https:') {
+            return reply.code(400).send({ error: '"evidenceURI" must use https:// scheme' });
+          }
+        } catch {
+          return reply.code(400).send({ error: '"evidenceURI" must be a valid https:// URL' });
+        }
+      }
 
       // Derive attester from x402 payment proof (EIP-3009 `from` = payer wallet)
       let attester: string | undefined;
