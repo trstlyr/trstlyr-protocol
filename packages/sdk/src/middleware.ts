@@ -34,8 +34,12 @@ export interface TrustGateOptions {
 }
 
 /**
- * Express/Connect-style middleware.
+ * Express/Connect-style middleware that gates requests on trust score.
+ * Blocks requests below the threshold with 403; attaches `trustScore` to `req` on pass.
+ * @param opts - Gate options: subject extraction, threshold, custom block response.
+ * @returns Async middleware function `(req, res, next) => Promise<void>`.
  *
+ * @example
  * ```ts
  * app.use(trustGate({
  *   subjectFrom: (req) => req.headers['x-agent-id'] as string,
@@ -80,8 +84,12 @@ export function trustGate(opts: TrustGateOptions) {
 }
 
 /**
- * Fastify onRequest hook.
+ * Fastify onRequest hook that gates requests on trust score.
+ * Blocks requests below the threshold; attaches `trustScore` to `request` on pass.
+ * @param opts - Gate options: subject extraction, threshold, custom block response.
+ * @returns Async hook function `(request, reply) => Promise<void>`.
  *
+ * @example
  * ```ts
  * server.addHook('onRequest', trustGateHook({
  *   subjectFrom: (req) => req.headers['x-agent-id'] as string,

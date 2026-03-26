@@ -293,8 +293,8 @@ export class ClawHubProvider implements Provider {
     } finally {
       clearTimeout(timer);
     }
-    if (res.status === 404) throw new Error(`404: skill "${slug}" not found`);
-    if (!res.ok) throw new Error(`ClawHub API error ${res.status}`);
+    if (res.status === 404) throw new HttpError(404, `skill "${slug}" not found`);
+    if (!res.ok) throw new HttpError(res.status, `ClawHub API error`);
     const body = await res.json() as SkillDetailResponse;
     if (!body.skill) throw new Error(`No skill data for "${slug}"`);
     return body;

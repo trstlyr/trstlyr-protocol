@@ -67,8 +67,9 @@ export interface ScoreInterpretation {
   sybil_resistance: 'low' | 'medium' | 'high';
 }
 
+/** Aggregated trust evaluation result — returned by TrustEngine.query() and the REST API. */
 export interface TrustResult {
-  subject: string;           // Full Aegis subject identifier
+  subject: string;           // Full subject identifier
   trust_score: number;       // Projected score: b + a×u
   confidence: number;        // 1 - uncertainty
   uncertainty: number;       // raw SL uncertainty (= 1 - confidence), 0-1
@@ -123,6 +124,7 @@ export interface Provider {
 
 // ─── Engine Config ────────────────────────────────────────────────────────────
 
+/** Engine configuration — providers, cache strategy, attestation settings, and scoring params. */
 export interface TrstLyrConfig {
   providers?: Provider[];
   cache?: 'memory' | 'none';

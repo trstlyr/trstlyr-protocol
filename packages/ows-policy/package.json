@@ -1,6 +1,6 @@
 {
   "name": "@trstlyr/ows-policy",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "TrstLyr trust-gated signing policy for the Open Wallet Standard",
   "license": "Apache-2.0",
   "type": "module",
@@ -30,7 +30,7 @@
     "@open-wallet-standard/core": "^1.1.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

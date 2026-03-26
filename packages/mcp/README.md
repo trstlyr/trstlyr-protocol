@@ -11,13 +11,14 @@ Install it in Claude Desktop, Cursor, or any MCP-compatible host in minutes.
 | `trust_query` | Full trust report: score, risk level, signals, and evidence |
 | `should_proceed` | Binary go/no-go check with reasoning |
 | `trust_explain` | Narrative explanation of why a subject has its trust rating |
+| `trust_batch` | Batch trust query for up to 20 subjects at once |
 
 ## Quick Install (Claude Desktop)
 
 **1. Clone and build:**
 ```bash
-git clone https://github.com/tankcdr/aegis.git
-cd aegis
+git clone https://github.com/trstlyr/trstlyr-protocol.git
+cd trstlyr-protocol
 pnpm install
 pnpm -r build
 ```
@@ -26,9 +27,9 @@ pnpm -r build
 ```json
 {
   "mcpServers": {
-    "aegis": {
+    "trstlyr": {
       "command": "node",
-      "args": ["/path/to/aegis/packages/mcp/dist/index.js"],
+      "args": ["/path/to/trstlyr-protocol/packages/mcp/dist/index.js"],
       "env": {
         "GITHUB_TOKEN": "ghp_your_token_here"
       }
@@ -37,7 +38,7 @@ pnpm -r build
 }
 ```
 
-**3. Restart Claude Desktop.** Three new tools appear automatically.
+**3. Restart Claude Desktop.** Four new tools appear automatically.
 
 ## Subject Format
 
@@ -46,8 +47,8 @@ Use `namespace:id` format:
 | Subject | Meaning |
 |---------|---------|
 | `github:tankcdr` | GitHub user |
-| `github:tankcdr/aegis` | GitHub repository |
-| `tankcdr/aegis` | Shorthand — defaults to `github` namespace |
+| `github:trstlyr/trstlyr-protocol` | GitHub repository |
+| `tankcdr/trstlyr-protocol` | Shorthand — defaults to `github` namespace |
 
 ## Example Prompts
 
@@ -55,7 +56,7 @@ Use `namespace:id` format:
 
 > "Should I install `github:modelcontextprotocol/servers`? Check trust first with action install."
 
-> "Explain why `github:tankcdr/aegis` has its trust rating."
+> "Explain why `github:trstlyr/trstlyr-protocol` has its trust rating."
 
 > "Check trust for `openai/openai-node` — I'm about to run it."
 
@@ -67,14 +68,14 @@ Use `namespace:id` format:
 
 ## How It Works
 
-Each trust query runs through the Aegis 7-step pipeline:
+Each trust query runs through the TrstLyr 7-step pipeline:
 
 1. **Identity resolution** — parse subject into canonical namespace:id
 2. **Signal dispatch** — fan out to all eligible providers in parallel
 3. **Fraud detection** — lightweight anomaly detection
-4. **Subjective Logic fusion** — cumulative belief fusion (Jøsang, 2001)
-5. **Ev-Trust adjustment** — λ=0.15 evolutionary stability penalty on conflicting signals
-6. **Risk mapping** — score → risk level → recommendation
+4. **Subjective Logic fusion** — cumulative belief fusion (Josang, 2001)
+5. **Ev-Trust adjustment** — evolutionary stability penalty on conflicting signals
+6. **Risk mapping** — score to risk level to recommendation
 7. **Cache** — results cached in-memory (TTL: 5 min default)
 
 ## License

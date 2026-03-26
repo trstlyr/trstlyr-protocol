@@ -14,12 +14,17 @@ const DEFAULT_TIMEOUT = 10_000;
 
 const OUTCOME_MAP: Record<string, number> = { failed: 0, partial: 1, success: 2 };
 
+/**
+ * Lightweight HTTP client for the TrstLyr REST API.
+ * Supports trust scoring, attestation, and behavioral attestation endpoints.
+ */
 export class TrstLyrClient {
   private readonly baseUrl: string;
   private readonly timeout: number;
   private readonly apiKey?: string;
   private readonly strictMode: boolean;
 
+  /** @param config - Client configuration (baseUrl, timeout, apiKey, strictMode). */
   constructor(config: ClientConfig = {}) {
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.timeout = config.timeout ?? DEFAULT_TIMEOUT;
@@ -29,14 +34,32 @@ export class TrstLyrClient {
 
   // ── Public API ──
 
+  /**
+   * Query the trust score for a subject.
+   * @param subject - Subject identifier in namespace:id format (e.g. "github:tankcdr").
+   * @returns Trust score result with score, confidence, risk level, and signals.
+   * @throws {TrstLyrError} On non-402 HTTP errors.
+   * @throws {PaymentRequiredError} On 402 responses with x402 payment details.
+   */
   async score(subject: string): Promise<TrustScore> {
     return this.get<TrustScore>(`/v1/trust/score/${encodeURIComponent(subject)}`);
   }
 
+  /**
+   * Anchor a trust attestation on-chain via EAS on Base.
+   * @param subject - Subject identifier to attest.
+   * @returns Attestation result with UID.
+   * @throws {PaymentRequiredError} After the first free attestation ($0.01 USDC via x402).
+   */
   async attest(subject: string): Promise<Attestation> {
     return this.post<Attestation>('/v1/attest', { subject });
   }
 
+  /**
+   * Submit a post-interaction behavioral attestation.
+   * @param opts - Behavioral attestation options (subject, outcome, rating, etc.).
+   * @returns Behavioral attestation result.
+   */
   async behavioral(opts: BehavioralOpts): Promise<BehavioralResult> {
     const body = {
       subject: opts.subject,
@@ -50,6 +73,11 @@ export class TrstLyrClient {
     return this.post<BehavioralResult>('/v1/attest/behavioral', body);
   }
 
+  /**
+   * Retrieve behavioral attestation history for a subject.
+   * @param subject - Subject identifier to query history for.
+   * @returns Behavioral history including attestations and summary.
+   */
   async behaviorHistory(subject: string): Promise<BehavioralHistory> {
     return this.get<BehavioralHistory>(`/v1/trust/behavior/${encodeURIComponent(subject)}`);
   }

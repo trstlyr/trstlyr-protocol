@@ -182,10 +182,10 @@ export class MoltbookProvider implements Provider {
       clearTimeout(timer);
     }
 
-    if (res.status === 404) throw new Error(`404: agent "${agentName}" not found on Moltbook`);
-    if (res.status === 401) throw new Error('Moltbook API key invalid or expired');
-    if (res.status === 429) throw new Error('Rate limited by Moltbook API');
-    if (!res.ok) throw new Error(`Moltbook API error ${res.status}`);
+    if (res.status === 404) throw new HttpError(404, `agent "${agentName}" not found on Moltbook`);
+    if (res.status === 401) throw new HttpError(401, 'Moltbook API key invalid or expired');
+    if (res.status === 429) throw new HttpError(429, 'Rate limited by Moltbook API');
+    if (!res.ok) throw new HttpError(res.status, `Moltbook API error`);
 
     const body = await res.json() as MoltbookProfileResponse;
     if (body.error) throw new Error(body.error);

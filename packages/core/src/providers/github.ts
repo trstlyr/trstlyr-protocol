@@ -343,16 +343,17 @@ export class GitHubProvider implements Provider {
     }
 
     if (res.status === 404) {
-      throw new Error(`404 Not Found: ${path}`);
+      throw new HttpError(404, `Not Found: ${path}`);
     }
     if (res.status === 403 || res.status === 429) {
       const retryAfter = res.headers.get('Retry-After') ?? 'unknown';
-      throw new Error(
-        `Rate limited (${res.status}): retry after ${retryAfter}s`,
+      throw new HttpError(
+        res.status,
+        `Rate limited: retry after ${retryAfter}s`,
       );
     }
     if (!res.ok) {
-      throw new Error(`GitHub API error ${res.status} for ${path}`);
+      throw new HttpError(res.status, `GitHub API error for ${path}`);
     }
 
     return res.json() as Promise<T>;

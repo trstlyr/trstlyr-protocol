@@ -1,6 +1,6 @@
 {
   "name": "@trstlyr/api",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "TrstLyr HTTP API \u2014 Fastify adapter over @trstlyr/core",
   "private": true,
   "license": "Apache-2.0",

@@ -22,6 +22,7 @@ export { ERC8004Provider }  from './providers/index.js';
 export { MoltbookProvider } from './providers/index.js';
 export { ClawHubProvider }  from './providers/index.js';
 export { BehavioralProvider } from './providers/index.js';
+export { SelfProtocolProvider } from './providers/index.js';
 export type { BehavioralRow, BehavioralFetcher } from './providers/index.js';
 
 // ── Identity graph ───────────────────────────────────────────────────────────

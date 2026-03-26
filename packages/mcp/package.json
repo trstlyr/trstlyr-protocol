@@ -1,6 +1,6 @@
 {
   "name": "@trstlyr/mcp",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "TrstLyr MCP server \u2014 trust queries for AI agents",
   "license": "Apache-2.0",
   "type": "module",
@@ -8,6 +8,14 @@
     "trstlyr-mcp": "./dist/index.js"
   },
   "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
@@ -29,7 +37,7 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "publishConfig": {
     "access": "public"

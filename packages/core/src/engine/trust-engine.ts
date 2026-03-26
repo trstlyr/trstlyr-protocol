@@ -40,6 +40,10 @@ import {
   recommendationLabel,
 } from './scoring.js';
 
+/**
+ * Embeddable trust scoring engine — aggregates signals from registered providers,
+ * fuses them via Subjective Logic + Ev-Trust, and optionally anchors results on-chain via EAS.
+ */
 export class TrustEngine {
   private readonly providers: Provider[];
   private readonly cache: TrustCache;
@@ -49,6 +53,7 @@ export class TrustEngine {
   /** In-flight queries — deduplicates simultaneous requests for the same subject */
   private readonly inFlight = new Map<string, Promise<TrustResult>>();
 
+  /** @param config - Optional engine configuration (providers, cache, attestation, scoring params). */
   constructor(config: TrstLyrConfig = {}) {
     // Build default provider set based on available env vars
     // Explicit config.providers always wins; otherwise auto-detect from env
@@ -67,6 +72,11 @@ export class TrustEngine {
       : null;
   }
 
+  /**
+   * Evaluate trust for a subject by dispatching to all eligible providers and fusing signals.
+   * @param request - The subject and optional context to evaluate.
+   * @returns Aggregated trust result with score, confidence, risk level, and signals.
+   */
   async query(request: EvaluateRequest): Promise<TrustResult> {
     const { subject, context } = request;
 

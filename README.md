@@ -51,7 +51,7 @@ curl https://api.trstlyr.ai/v1/trust/score/github:tankcdr
 # Pre-action trust gate — should my agent proceed?
 curl -X POST https://api.trstlyr.ai/v1/trust/gate \
   -H "Content-Type: application/json" \
-  -d '{"subject":"github:tankcdr","action":"delegate"}'
+  -d '{"counterparty":"github:tankcdr","action":"delegate"}'
 
 # Anchor score on-chain (1st free, then $0.01 USDC via x402)
 curl -X POST https://api.trstlyr.ai/v1/attest \
@@ -74,7 +74,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Gives your agent three tools: `trust_query`, `should_proceed`, `trust_explain`.
+Gives your agent four tools: `trust_query`, `should_proceed`, `trust_explain`, `trust_batch`.
 
 ---
 
@@ -147,7 +147,7 @@ Agent / CLI / Platform
    └── Cache (TTL per signal type)
         │
         ▼
-   6 Signal Providers ──► EAS Attestation Bridge (Base L2)
+   7 Signal Providers ──► EAS Attestation Bridge (Base L2)
 ```
 
 Self-host: `git clone https://github.com/trstlyr/trstlyr-protocol && docker compose up -d`

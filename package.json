@@ -1,6 +1,6 @@
 {
   "name": "trstlyr-protocol",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "The trust layer for the agent internet",
   "license": "Apache-2.0",
@@ -19,6 +19,7 @@
     "format:check": "prettier --check \"packages/*/src/**/*.ts\" \"apps/*/src/**/*.ts\""
   },
   "workspaces": [
+    "apps/*",
     "packages/*",
     "contracts"
   ],
@@ -29,7 +30,5 @@
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.1"
   },
-  "dependencies": {
-    "sharp": "^0.34.5"
-  }
+  "dependencies": {}
 }

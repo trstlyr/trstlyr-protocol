@@ -1,6 +1,6 @@
 {
   "name": "@trstlyr/sdk",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Lightweight SDK for querying trust scores and posting behavioral attestations to the TrstLyr API",
   "license": "Apache-2.0",
   "type": "module",
@@ -36,7 +36,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "keywords": [
     "trust",

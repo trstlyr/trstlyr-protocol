@@ -35,9 +35,7 @@ logs:
 
 ## build: Build all packages
 build:
-	pnpm --filter @trstlyr/core build
-	pnpm --filter @trstlyr/api build
-	pnpm --filter @trstlyr/web build
+	pnpm -r build
 
 ## install: Install all dependencies
 install:
@@ -47,7 +45,8 @@ install:
 
 ## clean: Remove build artifacts
 clean:
-	rm -rf packages/core/dist apps/api/dist apps/web/.next
+	pnpm -r --if-present exec rm -rf dist
+	rm -rf apps/web/.next
 
 ## help: Show this help
 help:
