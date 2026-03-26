@@ -108,7 +108,7 @@ ${c.bold('GATE OPTIONS')}
   --strict                 Exit 2 on API error (default: fail-open)
 
 ${c.bold('BEHAVIORAL OPTIONS')}
-  --outcome <value>        success | failure | dispute  (required)
+  --outcome <value>        success | partial | failed  (required)
   --rating <N>             1-5  (required)
   --value <N>              USD value of interaction
   --attestor <subject>     Who is attesting
@@ -188,7 +188,6 @@ async function cmdBehavioral(
   outcome: string,
   rating: number,
   value: number | undefined,
-  _attestor: string | undefined,
   json: boolean,
 ): Promise<void> {
   const result = await sdkBehavioral({
@@ -264,7 +263,7 @@ export async function main(): Promise<void> {
       }
       const rating = parseInt(ratingStr, 10);
       const value = values.value ? parseFloat(values.value as string) : undefined;
-      await cmdBehavioral(subject, outcome, rating, value, values.attestor as string | undefined, jsonOutput);
+      await cmdBehavioral(subject, outcome, rating, value, jsonOutput);
       break;
     }
 

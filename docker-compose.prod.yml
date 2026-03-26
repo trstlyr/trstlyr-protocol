@@ -1,17 +1,17 @@
-# Aegis — production self-hosted deployment
+# TrstLyr — production self-hosted deployment
 # PostgreSQL + Redis — for high-traffic or multi-instance deployments.
 #
 # Usage:
 #   docker compose -f docker-compose.prod.yml up
 
 services:
-  aegis:
+  trstlyr:
     build: .
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://aegis:${POSTGRES_PASSWORD}@postgres:5432/aegis
+      DATABASE_URL: postgresql://trstlyr:${POSTGRES_PASSWORD}@postgres:5432/trstlyr
       CACHE_DRIVER: redis
       REDIS_URL: redis://redis:6379
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
@@ -19,8 +19,8 @@ services:
       CLAWHUB_API_KEY: ${CLAWHUB_API_KEY:-}
       ATTESTATION_ENABLED: ${ATTESTATION_ENABLED:-false}
       BASE_RPC_URL: ${BASE_RPC_URL:-}
-      AEGIS_EAS_SCHEMA_UID: ${AEGIS_EAS_SCHEMA_UID:-}
-      AEGIS_ATTESTATION_PRIVATE_KEY: ${AEGIS_ATTESTATION_PRIVATE_KEY:-}
+      TRSTLYR_EAS_SCHEMA_UID: ${TRSTLYR_EAS_SCHEMA_UID:-}
+      TRSTLYR_ATTESTATION_PRIVATE_KEY: ${TRSTLYR_ATTESTATION_PRIVATE_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -31,13 +31,13 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: aegis
-      POSTGRES_USER: aegis
+      POSTGRES_DB: trstlyr
+      POSTGRES_USER: trstlyr
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aegis"]
+      test: ["CMD-SHELL", "pg_isready -U trstlyr"]
       interval: 10s
       timeout: 5s
       retries: 5

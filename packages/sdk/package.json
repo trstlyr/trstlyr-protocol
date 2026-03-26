@@ -24,11 +24,13 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "prepublishOnly": "tsc"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^4.0.18"
   },
   "publishConfig": {
     "access": "public"
@@ -46,11 +48,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/tankcdr/aegis.git",
+    "url": "https://github.com/trstlyr/trstlyr-protocol.git",
     "directory": "packages/sdk"
   },
-  "homepage": "https://github.com/tankcdr/aegis/tree/main/packages/sdk#readme",
+  "homepage": "https://github.com/trstlyr/trstlyr-protocol/tree/main/packages/sdk#readme",
   "bugs": {
-    "url": "https://github.com/tankcdr/aegis/issues"
+    "url": "https://github.com/trstlyr/trstlyr-protocol/issues"
   }
 }

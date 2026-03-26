@@ -17,7 +17,7 @@
     "prepublishOnly": "tsc"
   },
   "dependencies": {
-    "@trstlyr/sdk": "^0.1.0"
+    "@trstlyr/sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -37,11 +37,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/tankcdr/aegis.git",
+    "url": "https://github.com/trstlyr/trstlyr-protocol.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/tankcdr/aegis/tree/main/packages/cli#readme",
+  "homepage": "https://github.com/trstlyr/trstlyr-protocol/tree/main/packages/cli#readme",
   "bugs": {
-    "url": "https://github.com/tankcdr/aegis/issues"
+    "url": "https://github.com/trstlyr/trstlyr-protocol/issues"
   }
 }

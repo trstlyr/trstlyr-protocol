@@ -4,13 +4,13 @@
 
 ## dev: Start API (Docker) + Web UI (Next.js hot reload)
 dev:
-	@echo "⛵ Starting Aegis locally..."
+	@echo "⛵ Starting TrstLyr locally..."
 	@cp -n .env.example .env 2>/dev/null && echo "  Created .env from .env.example" || true
 	@docker compose up -d
 	@echo "  API  → http://localhost:3000"
 	@echo "  UI   → http://localhost:3001 (starting...)"
 	@echo ""
-	pnpm --filter @aegis-protocol/web dev
+	pnpm --filter @trstlyr/web dev
 
 ## api: Start API only (Docker)
 api:
@@ -21,7 +21,7 @@ api:
 
 ## web: Start web UI only (assumes API is already running)
 web:
-	pnpm --filter @aegis-protocol/web dev
+	pnpm --filter @trstlyr/web dev
 
 ## stop: Stop all Docker services
 stop:
@@ -35,9 +35,9 @@ logs:
 
 ## build: Build all packages
 build:
-	pnpm --filter @aegis-protocol/core build
-	pnpm --filter @aegis-protocol/api build
-	pnpm --filter @aegis-protocol/web build
+	pnpm --filter @trstlyr/core build
+	pnpm --filter @trstlyr/api build
+	pnpm --filter @trstlyr/web build
 
 ## install: Install all dependencies
 install:

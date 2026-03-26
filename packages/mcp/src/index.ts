@@ -29,8 +29,8 @@ const server = new McpServer(
 /**
  * Parse a subject string into namespace + id.
  * Accepts:
- *   "github:tankcdr/aegis"   → { namespace: "github", id: "tankcdr/aegis" }
- *   "tankcdr/aegis"          → { namespace: "github", id: "tankcdr/aegis" }  (github default)
+ *   "github:trstlyr/trstlyr-protocol"   → { namespace: "github", id: "trstlyr/trstlyr-protocol" }
+ *   "trstlyr/trstlyr-protocol"          → { namespace: "github", id: "trstlyr/trstlyr-protocol" }  (github default)
  *   "github:tankcdr"         → { namespace: "github", id: "tankcdr" }
  */
 function parseSubject(raw: string): { namespace: string; id: string } {
@@ -143,7 +143,7 @@ server.registerTool(
         .string()
         .describe(
           'Subject to evaluate. Format: "namespace:id" or "owner/repo". ' +
-          'Examples: "github:tankcdr/aegis", "github:octocat", "openai/openai-python"',
+          'Examples: "github:trstlyr/trstlyr-protocol", "github:octocat", "openai/openai-python"',
         ),
       action: z
         .enum(['install', 'execute', 'delegate', 'transact', 'review'])
@@ -152,12 +152,16 @@ server.registerTool(
     },
   },
   async ({ subject, action }) => {
-    const { namespace, id } = parseSubject(subject);
-    const result = await engine.query({
-      subject: { type: 'agent', namespace, id },
-      context: action ? { action: action as Action } : undefined,
-    });
-    return { content: [{ type: 'text', text: formatTrustReport(result, subject) }] };
+    try {
+      const { namespace, id } = parseSubject(subject);
+      const result = await engine.query({
+        subject: { type: 'agent', namespace, id },
+        context: action ? { action: action as Action } : undefined,
+      });
+      return { content: [{ type: 'text', text: formatTrustReport(result, subject) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: 'Error: ' + (err instanceof Error ? err.message : String(err)) }], isError: true };
+    }
   },
 );
 
@@ -188,32 +192,36 @@ server.registerTool(
     },
   },
   async ({ subject, action, min_score = 60 }) => {
-    const { namespace, id } = parseSubject(subject);
-    const result = await engine.query({
-      subject: { type: 'agent', namespace, id },
-      context: action ? { action: action as Action } : undefined,
-    });
+    try {
+      const { namespace, id } = parseSubject(subject);
+      const result = await engine.query({
+        subject: { type: 'agent', namespace, id },
+        context: action ? { action: action as Action } : undefined,
+      });
 
-    const proceed = result.trust_score >= min_score && result.recommendation !== 'deny' && result.recommendation !== 'caution';
-    const verdict = proceed ? '**PROCEED: YES** ✅' : '**PROCEED: NO** ❌';
+      const proceed = result.trust_score >= min_score && result.recommendation !== 'deny' && result.recommendation !== 'caution';
+      const verdict = proceed ? '**PROCEED: YES** ✅' : '**PROCEED: NO** ❌';
 
-    const text = [
-      verdict,
-      '',
-      `**Subject:** ${subject}`,
-      `**Score:** ${result.trust_score.toFixed(1)}% (minimum required: ${min_score.toFixed(1)}%)`,
-      `**Risk:** ${riskEmoji(result.risk_level)} ${result.risk_level}`,
-      `**Recommendation:** ${recommendEmoji(result.recommendation)} ${result.recommendation_label ?? result.recommendation}`,
-      '',
-      proceed
-        ? `This subject meets the minimum trust threshold. ${result.signals.length} signal(s) collected.`
-        : `This subject does NOT meet the minimum trust threshold. ` +
-          (result.fraud_signals.length > 0
-            ? `${result.fraud_signals.length} fraud signal(s) detected.`
-            : `Score ${result.trust_score.toFixed(1)}% is below the required ${min_score.toFixed(1)}%.`),
-    ].join('\n');
+      const text = [
+        verdict,
+        '',
+        `**Subject:** ${subject}`,
+        `**Score:** ${result.trust_score.toFixed(1)}% (minimum required: ${min_score.toFixed(1)}%)`,
+        `**Risk:** ${riskEmoji(result.risk_level)} ${result.risk_level}`,
+        `**Recommendation:** ${recommendEmoji(result.recommendation)} ${result.recommendation_label ?? result.recommendation}`,
+        '',
+        proceed
+          ? `This subject meets the minimum trust threshold. ${result.signals.length} signal(s) collected.`
+          : `This subject does NOT meet the minimum trust threshold. ` +
+            (result.fraud_signals.length > 0
+              ? `${result.fraud_signals.length} fraud signal(s) detected.`
+              : `Score ${result.trust_score.toFixed(1)}% is below the required ${min_score.toFixed(1)}%.`),
+      ].join('\n');
 
-    return { content: [{ type: 'text', text }] };
+      return { content: [{ type: 'text', text }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: 'Error: ' + (err instanceof Error ? err.message : String(err)) }], isError: true };
+    }
   },
 );
 
@@ -233,78 +241,82 @@ server.registerTool(
     },
   },
   async ({ subject }) => {
-    const { namespace, id } = parseSubject(subject);
-    const result = await engine.query({
-      subject: { type: 'agent', namespace, id },
-    });
+    try {
+      const { namespace, id } = parseSubject(subject);
+      const result = await engine.query({
+        subject: { type: 'agent', namespace, id },
+      });
 
-    const lines: string[] = [
-      `## Why does \`${subject}\` have a ${result.risk_level} trust rating?`,
-      '',
-      `TrstLyr evaluated \`${subject}\` using **${result.signals.length}** signal${result.signals.length !== 1 ? 's' : ''}` +
-        (result.unresolved.length > 0 ? ` (${result.unresolved.length} provider(s) could not be reached)` : '') +
-        ':',
-      '',
-    ];
+      const lines: string[] = [
+        `## Why does \`${subject}\` have a ${result.risk_level} trust rating?`,
+        '',
+        `TrstLyr evaluated \`${subject}\` using **${result.signals.length}** signal${result.signals.length !== 1 ? 's' : ''}` +
+          (result.unresolved.length > 0 ? ` (${result.unresolved.length} provider(s) could not be reached)` : '') +
+          ':',
+        '',
+      ];
 
-    if (result.signals.length === 0) {
+      if (result.signals.length === 0) {
+        lines.push(
+          '> No signals could be collected. This typically means the subject does not exist ' +
+          'on any supported platform, or all providers failed to respond.',
+        );
+      }
+
+      for (const sig of result.signals) {
+        lines.push(`### ${sig.signal_type} (via ${sig.provider})`);
+        lines.push(`**Score:** ${(sig.score * 100).toFixed(1)}% | **Confidence:** ${(sig.confidence * 100).toFixed(1)}%`);
+
+        // Narrative based on evidence
+        const ev = sig.evidence;
+        if (sig.signal_type === 'author_reputation' && ev['followers'] !== undefined) {
+          lines.push(
+            `The author has **${ev['followers']} followers** and **${ev['public_repos']} public repositories**, ` +
+            `with an account age of **${ev['account_age_days']} days**. ` +
+            (Number(ev['followers']) > 100
+              ? 'This indicates an established presence in the community.'
+              : 'This is a relatively new or low-activity account.'),
+          );
+        } else if (sig.signal_type === 'repo_health' && ev['stars'] !== undefined) {
+          lines.push(
+            `The repository has **${ev['stars']} stars** and **${ev['forks']} forks**, ` +
+            `last pushed **${ev['days_since_push']} day(s) ago**. ` +
+            (Number(ev['days_since_push']) < 30
+              ? 'The project is actively maintained.'
+              : Number(ev['days_since_push']) < 180
+              ? 'The project has seen recent activity.'
+              : 'The project may be unmaintained.') +
+            (ev['license'] ? ` License: ${ev['license']}.` : ' No license detected.'),
+          );
+        } else if (ev['error']) {
+          lines.push(`⚠️ Error collecting this signal: ${ev['error']}`);
+        }
+        lines.push('');
+      }
+
+      lines.push('### Overall Assessment');
       lines.push(
-        '> No signals could be collected. This typically means the subject does not exist ' +
-        'on any supported platform, or all providers failed to respond.',
+        `After fusing all signals using **Subjective Logic** (Jøsang, 2001) with ` +
+        `Ev-Trust evolutionary stability adjustment (λ=0.15, arXiv:2512.16167v2), ` +
+        `the projected trust score is **${result.trust_score.toFixed(1)}%** ` +
+        `with **${(result.confidence * 100).toFixed(1)}%** confidence. ` +
+        `This corresponds to a **${result.risk_level}** risk level.`,
       );
-    }
-
-    for (const sig of result.signals) {
-      lines.push(`### ${sig.signal_type} (via ${sig.provider})`);
-      lines.push(`**Score:** ${(sig.score * 100).toFixed(1)}% | **Confidence:** ${(sig.confidence * 100).toFixed(1)}%`);
-
-      // Narrative based on evidence
-      const ev = sig.evidence;
-      if (sig.signal_type === 'author_reputation' && ev['followers'] !== undefined) {
-        lines.push(
-          `The author has **${ev['followers']} followers** and **${ev['public_repos']} public repositories**, ` +
-          `with an account age of **${ev['account_age_days']} days**. ` +
-          (Number(ev['followers']) > 100
-            ? 'This indicates an established presence in the community.'
-            : 'This is a relatively new or low-activity account.'),
-        );
-      } else if (sig.signal_type === 'repo_health' && ev['stars'] !== undefined) {
-        lines.push(
-          `The repository has **${ev['stars']} stars** and **${ev['forks']} forks**, ` +
-          `last pushed **${ev['days_since_push']} day(s) ago**. ` +
-          (Number(ev['days_since_push']) < 30
-            ? 'The project is actively maintained.'
-            : Number(ev['days_since_push']) < 180
-            ? 'The project has seen recent activity.'
-            : 'The project may be unmaintained.') +
-          (ev['license'] ? ` License: ${ev['license']}.` : ' No license detected.'),
-        );
-      } else if (ev['error']) {
-        lines.push(`⚠️ Error collecting this signal: ${ev['error']}`);
-      }
       lines.push('');
-    }
+      lines.push(`**Recommendation:** ${recommendEmoji(result.recommendation)} ${result.recommendation_label ?? result.recommendation.toUpperCase()}`);
 
-    lines.push('### Overall Assessment');
-    lines.push(
-      `After fusing all signals using **Subjective Logic** (Jøsang, 2001) with ` +
-      `Ev-Trust evolutionary stability adjustment (λ=0.15, arXiv:2512.16167v2), ` +
-      `the projected trust score is **${result.trust_score.toFixed(1)}%** ` +
-      `with **${(result.confidence * 100).toFixed(1)}%** confidence. ` +
-      `This corresponds to a **${result.risk_level}** risk level.`,
-    );
-    lines.push('');
-    lines.push(`**Recommendation:** ${recommendEmoji(result.recommendation)} ${result.recommendation_label ?? result.recommendation.toUpperCase()}`);
-
-    if (result.fraud_signals.length > 0) {
-      lines.push('');
-      lines.push('### ⚠️ Fraud Signals Detected');
-      for (const fs of result.fraud_signals) {
-        lines.push(`- **${fs.type}** [${fs.severity}]: ${fs.description}`);
+      if (result.fraud_signals.length > 0) {
+        lines.push('');
+        lines.push('### ⚠️ Fraud Signals Detected');
+        for (const fs of result.fraud_signals) {
+          lines.push(`- **${fs.type}** [${fs.severity}]: ${fs.description}`);
+        }
       }
-    }
 
-    return { content: [{ type: 'text', text: lines.join('\n') }] };
+      return { content: [{ type: 'text', text: lines.join('\n') }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: 'Error: ' + (err instanceof Error ? err.message : String(err)) }], isError: true };
+    }
   },
 );
 
@@ -326,7 +338,7 @@ server.registerTool(
         .describe(
           'List of subjects to evaluate (max 20). ' +
           'Format: "namespace:id" or "owner/repo". ' +
-          'Example: ["github:tankcdr/aegis", "github:openai", "erc8004:19077"]',
+          'Example: ["github:trstlyr/trstlyr-protocol", "github:openai", "erc8004:19077"]',
         ),
       action: z
         .enum(['install', 'execute', 'delegate', 'transact', 'review'])
@@ -335,50 +347,57 @@ server.registerTool(
     },
   },
   async ({ subjects, action }) => {
-    const results = await Promise.allSettled(
-      subjects.map(subject => {
-        const { namespace, id } = parseSubject(subject);
-        return engine.query({
-          subject: { type: 'agent', namespace, id },
-          context: action ? { action: action as Action } : undefined,
-        }).then(r => ({ subject, result: r }));
-      }),
-    );
+    try {
+      type BatchSuccess = { subject: string; result: TrustResult; error?: false };
+      type BatchError = { subject: string; result: null; error: true };
+      type BatchRow = BatchSuccess | BatchError;
 
-    // Sort fulfilled results by trust_score descending
-    const rows = results
-      .map((r, i) =>
-        r.status === 'fulfilled'
-          ? r.value
-          : { subject: subjects[i]!, result: null as unknown as import('@trstlyr/core').TrustResult, error: true },
-      )
-      .sort((a, b) => {
-        if (!a.result) return 1;
-        if (!b.result) return -1;
-        return b.result.trust_score - a.result.trust_score;
-      });
+      const results = await Promise.allSettled(
+        subjects.map(subject => {
+          const { namespace, id } = parseSubject(subject);
+          return engine.query({
+            subject: { type: 'agent', namespace, id },
+            context: action ? { action: action as Action } : undefined,
+          }).then(r => ({ subject, result: r }) as BatchSuccess);
+        }),
+      );
 
-    const lines: string[] = [
-      `## TrstLyr Batch Report (${subjects.length} subjects)`,
-      '',
-      '| # | Subject | Score | Risk | Recommendation |',
-      '|---|---------|-------|------|----------------|',
-    ];
+      const rows: BatchRow[] = results
+        .map((r, i) =>
+          r.status === 'fulfilled'
+            ? r.value
+            : { subject: subjects[i]!, result: null, error: true as const },
+        )
+        .sort((a, b) => {
+          if (!a.result) return 1;
+          if (!b.result) return -1;
+          return b.result.trust_score - a.result.trust_score;
+        });
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i]!;
-      if (!row.result) {
-        lines.push(`| ${i + 1} | \`${row.subject}\` | — | — | ❌ Error |`);
-      } else {
-        lines.push(
-          `| ${i + 1} | \`${row.subject}\` | ${row.result.trust_score.toFixed(1)}% | ${riskEmoji(row.result.risk_level)} ${row.result.risk_level} | ${recommendEmoji(row.result.recommendation)} ${row.result.recommendation} |`,
-        );
+      const lines: string[] = [
+        `## TrstLyr Batch Report (${subjects.length} subjects)`,
+        '',
+        '| # | Subject | Score | Risk | Recommendation |',
+        '|---|---------|-------|------|----------------|',
+      ];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i]!;
+        if (row.error) {
+          lines.push(`| ${i + 1} | \`${row.subject}\` | — | — | ❌ Error |`);
+        } else {
+          lines.push(
+            `| ${i + 1} | \`${row.subject}\` | ${row.result.trust_score.toFixed(1)}% | ${riskEmoji(row.result.risk_level)} ${row.result.risk_level} | ${recommendEmoji(row.result.recommendation)} ${row.result.recommendation} |`,
+          );
+        }
       }
+
+      lines.push('', `*Evaluated: ${new Date().toISOString()}*`);
+
+      return { content: [{ type: 'text', text: lines.join('\n') }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: 'Error: ' + (err instanceof Error ? err.message : String(err)) }], isError: true };
     }
-
-    lines.push('', `*Evaluated: ${new Date().toISOString()}*`);
-
-    return { content: [{ type: 'text', text: lines.join('\n') }] };
   },
 );
 

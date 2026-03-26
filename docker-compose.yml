@@ -1,4 +1,4 @@
-# Aegis API — self-hosted deployment
+# TrstLyr API — self-hosted deployment
 #
 # Quickstart:
 #   cp .env.example .env
@@ -23,7 +23,7 @@ services:
       TWITTER_BEARER_TOKEN: ${TWITTER_BEARER_TOKEN:-}
       MOLTBOOK_API_KEY: ${MOLTBOOK_API_KEY:-}
       ATTESTATION_ENABLED: ${ATTESTATION_ENABLED:-false}
-      AEGIS_ATTESTATION_PRIVATE_KEY: ${AEGIS_ATTESTATION_PRIVATE_KEY:-}
+      TRSTLYR_ATTESTATION_PRIVATE_KEY: ${TRSTLYR_ATTESTATION_PRIVATE_KEY:-}
       PAYMENT_WALLET: ${PAYMENT_WALLET:-}
     restart: unless-stopped
     healthcheck:

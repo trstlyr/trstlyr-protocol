@@ -46,13 +46,15 @@ export interface OWSSignResult {
 
 export class TrustGateDeniedError extends Error {
   public readonly trustCheck: TrustCheckResult;
+  public readonly threshold: number;
 
-  constructor(trustCheck: TrustCheckResult) {
+  constructor(trustCheck: TrustCheckResult, threshold: number) {
     super(
-      `Trust gate denied: ${trustCheck.subject} scored ${trustCheck.score} (minimum: required). Risk: ${trustCheck.riskLevel}, recommendation: ${trustCheck.recommendation}`,
+      `Trust gate denied: ${trustCheck.subject} scored ${trustCheck.score} (minimum: ${threshold}). Risk: ${trustCheck.riskLevel}, recommendation: ${trustCheck.recommendation}`,
     );
     this.name = 'TrustGateDeniedError';
     this.trustCheck = trustCheck;
+    this.threshold = threshold;
   }
 }
 
@@ -80,7 +82,7 @@ export class TrustPolicy {
     const trustCheck = await this.preflightCheck(params.subject);
 
     if (!trustCheck.allowed) {
-      throw new TrustGateDeniedError(trustCheck);
+      throw new TrustGateDeniedError(trustCheck, this.minScore);
     }
 
     const result = await signTransaction(

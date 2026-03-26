@@ -13,17 +13,17 @@ RUN pnpm install --frozen-lockfile
 # ─── Build all packages ────────────────────────────────────────────────────────
 FROM deps AS build
 COPY . .
-RUN pnpm --filter @aegis-protocol/core build
-RUN pnpm --filter @aegis-protocol/api build
+RUN pnpm --filter @trstlyr/core build
+RUN pnpm --filter @trstlyr/api build
 
 # ─── Standalone deployment bundle (resolves workspace symlinks) ───────────────
 FROM build AS bundle
 WORKDIR /app
 # pnpm deploy creates a self-contained folder with all deps resolved — no symlinks
-RUN pnpm --filter @aegis-protocol/api deploy /deploy --prod
+RUN pnpm --filter @trstlyr/api deploy /deploy --prod
 
 # Copy compiled output (deploy only gets node_modules, not dist)
-COPY --from=build /app/packages/core/dist /deploy/node_modules/@aegis-protocol/core/dist
+COPY --from=build /app/packages/core/dist /deploy/node_modules/@trstlyr/core/dist
 COPY --from=build /app/apps/api/dist      /deploy/dist
 # Agent-readable skill manifest — served at GET /skill.md
 COPY --from=build /app/skill.md           /deploy/skill.md
@@ -37,11 +37,11 @@ COPY --from=build /app/config             /deploy/config
 FROM node:24-alpine AS runtime
 WORKDIR /app
 
-RUN addgroup -S aegis && adduser -S aegis -G aegis
+RUN addgroup -S trstlyr && adduser -S trstlyr -G trstlyr
 
-COPY --from=bundle --chown=aegis:aegis /deploy ./
+COPY --from=bundle --chown=trstlyr:trstlyr /deploy ./
 
-USER aegis
+USER trstlyr
 
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
