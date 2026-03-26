@@ -112,6 +112,19 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
+  packages/cli:
+    dependencies:
+      '@trstlyr/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.33
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
   packages/core:
     dependencies:
       ethers:
@@ -142,6 +155,15 @@ importers:
       zod:
         specifier: ^3.22.0
         version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.33
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/sdk:
     devDependencies:
       '@types/node':
         specifier: ^20.0.0

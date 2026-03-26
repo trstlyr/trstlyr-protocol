@@ -1,0 +1,47 @@
+{
+  "name": "@trstlyr/cli",
+  "version": "0.1.0",
+  "description": "CLI for checking agent trust scores via TrstLyr",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "trstlyr": "./bin/trstlyr.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "tsc"
+  },
+  "dependencies": {
+    "@trstlyr/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "trust",
+    "cli",
+    "ai-agents",
+    "trstlyr"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tankcdr/aegis.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/tankcdr/aegis/tree/main/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/tankcdr/aegis/issues"
+  }
+}
